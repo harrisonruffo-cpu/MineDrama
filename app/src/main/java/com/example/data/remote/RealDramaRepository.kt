@@ -239,7 +239,7 @@ class DramaRepository(context: Context) {
         list
     }
 
-    // Local DB integration
+    // Local DB & Cloud Sync integration
     fun getWatchHistory(): Flow<List<WatchHistoryEntity>> = dramaDao.getAllWatchHistory().flowOn(Dispatchers.IO)
 
     suspend fun saveWatchHistory(
@@ -249,33 +249,51 @@ class DramaRepository(context: Context) {
         episodeNumber: Int,
         lastPositionMs: Long,
         durationMs: Long,
-        totalEpisodes: Int
+        totalEpisodes: Int,
+        userId: String? = null
     ) = withContext(Dispatchers.IO) {
-        dramaDao.insertWatchHistory(
-            WatchHistoryEntity(
-                dramaId = dramaId,
-                dramaTitle = dramaTitle,
-                posterUrl = posterUrl,
-                lastEpisodeNumber = episodeNumber,
-                lastPositionMs = lastPositionMs,
-                durationMs = durationMs,
-                totalEpisodes = totalEpisodes,
-                updatedAt = System.currentTimeMillis()
-            )
+        val entity = WatchHistoryEntity(
+            dramaId = dramaId,
+            dramaTitle = dramaTitle,
+            posterUrl = posterUrl,
+            lastEpisodeNumber = episodeNumber,
+            lastPositionMs = lastPositionMs,
+            durationMs = durationMs,
+            totalEpisodes = totalEpisodes,
+            updatedAt = System.currentTimeMillis()
         )
+        dramaDao.insertWatchHistory(entity)
+        
         // Increment drama views in Firestore
         firestoreDataSource.incrementDramaViews(dramaId)
+
+        // Sync to cloud if user is logged in
+        if (!userId.isNullOrBlank()) {
+            try {
+                val currentHistory = dramaDao.getAllWatchHistoryList()
+                firestoreDataSource.saveUserWatchHistory(userId, currentHistory)
+            } catch (e: Exception) {
+                Log.w("DramaRepository", "Cloud watch history sync failed: ${e.message}")
+            }
+        }
     }
 
-    suspend fun clearHistory() = withContext(Dispatchers.IO) {
+    suspend fun clearHistory(userId: String? = null) = withContext(Dispatchers.IO) {
         dramaDao.clearWatchHistory()
+        if (!userId.isNullOrBlank()) {
+            try {
+                firestoreDataSource.saveUserWatchHistory(userId, emptyList())
+            } catch (e: Exception) {
+                Log.w("DramaRepository", "Cloud clear history sync failed: ${e.message}")
+            }
+        }
     }
 
     fun getFavorites(): Flow<List<FavoriteEntity>> = dramaDao.getAllFavorites().flowOn(Dispatchers.IO)
 
     fun isFavorite(dramaId: String): Flow<Boolean> = dramaDao.isFavoriteFlow(dramaId).flowOn(Dispatchers.IO)
 
-    suspend fun toggleFavorite(drama: Drama) = withContext(Dispatchers.IO) {
+    suspend fun toggleFavorite(drama: Drama, userId: String? = null) = withContext(Dispatchers.IO) {
         val isFav = dramaDao.isFavorite(drama.id)
         if (isFav) {
             dramaDao.removeFavorite(drama.id)
@@ -292,11 +310,21 @@ class DramaRepository(context: Context) {
                 )
             )
         }
+
+        // Sync to cloud if user is logged in
+        if (!userId.isNullOrBlank()) {
+            try {
+                val currentFavorites = dramaDao.getAllFavoritesList()
+                firestoreDataSource.saveUserFavorites(userId, currentFavorites)
+            } catch (e: Exception) {
+                Log.w("DramaRepository", "Cloud favorites sync failed: ${e.message}")
+            }
+        }
     }
 
     fun getLikedKeys(): Flow<List<String>> = dramaDao.getAllLikedKeys().flowOn(Dispatchers.IO)
 
-    suspend fun toggleLikeEpisode(dramaId: String, episodeNumber: Int, isCurrentlyLiked: Boolean) = withContext(Dispatchers.IO) {
+    suspend fun toggleLikeEpisode(dramaId: String, episodeNumber: Int, isCurrentlyLiked: Boolean, userId: String? = null) = withContext(Dispatchers.IO) {
         val key = "${dramaId}_$episodeNumber"
         if (isCurrentlyLiked) {
             dramaDao.removeLikedEpisode(dramaId, episodeNumber)
@@ -312,6 +340,97 @@ class DramaRepository(context: Context) {
             )
             firestoreDataSource.updateDramaLikes(dramaId, 1L)
         }
+
+        // Sync to cloud if user is logged in
+        if (!userId.isNullOrBlank()) {
+            try {
+                val currentLikedKeys = dramaDao.getAllLikedKeysList()
+                firestoreDataSource.saveUserLikedKeys(userId, currentLikedKeys)
+            } catch (e: Exception) {
+                Log.w("DramaRepository", "Cloud likes sync failed: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Complete Bidirectional Cloud Sync:
+     * Pulls cloud data (favorites, history, liked episodes, preferences) from Firestore
+     * and populates local Room DB and memory, ensuring full data restoration upon app reinstallation.
+     */
+    suspend fun syncUserCloudData(user: com.example.data.auth.UserProfile): Map<String, Any>? = withContext(Dispatchers.IO) {
+        if (user.uid.isBlank()) return@withContext null
+        try {
+            // 1. Save/Update user profile in Cloud
+            firestoreDataSource.saveUserProfile(user)
+
+            // 2. Fetch and restore Favorites from Cloud
+            val cloudFavorites = firestoreDataSource.getUserFavorites(user.uid)
+            if (cloudFavorites.isNotEmpty()) {
+                dramaDao.insertAllFavorites(cloudFavorites)
+            } else {
+                // If cloud is empty but local has items, backup local to cloud
+                val localFavorites = dramaDao.getAllFavoritesList()
+                if (localFavorites.isNotEmpty()) {
+                    firestoreDataSource.saveUserFavorites(user.uid, localFavorites)
+                }
+            }
+
+            // 3. Fetch and restore Watch History from Cloud
+            val cloudHistory = firestoreDataSource.getUserWatchHistory(user.uid)
+            if (cloudHistory.isNotEmpty()) {
+                dramaDao.insertAllWatchHistory(cloudHistory)
+            } else {
+                val localHistory = dramaDao.getAllWatchHistoryList()
+                if (localHistory.isNotEmpty()) {
+                    firestoreDataSource.saveUserWatchHistory(user.uid, localHistory)
+                }
+            }
+
+            // 4. Fetch and restore Liked Keys from Cloud
+            val cloudLikedKeys = firestoreDataSource.getUserLikedKeys(user.uid)
+            if (cloudLikedKeys.isNotEmpty()) {
+                val likedEntities = cloudLikedKeys.mapNotNull { key ->
+                    val parts = key.split("_")
+                    if (parts.size >= 2) {
+                        val dramaId = parts.dropLast(1).joinToString("_")
+                        val epNum = parts.last().toIntOrNull() ?: 1
+                        LikedEpisodeEntity(
+                            compositeKey = key,
+                            dramaId = dramaId,
+                            episodeNumber = epNum,
+                            likedAt = System.currentTimeMillis()
+                        )
+                    } else null
+                }
+                if (likedEntities.isNotEmpty()) {
+                    dramaDao.insertAllLikedEpisodes(likedEntities)
+                }
+            } else {
+                val localLikedKeys = dramaDao.getAllLikedKeysList()
+                if (localLikedKeys.isNotEmpty()) {
+                    firestoreDataSource.saveUserLikedKeys(user.uid, localLikedKeys)
+                }
+            }
+
+            // 5. Fetch user preferences (playback speed, autoplay, mute, coins)
+            val cloudPrefs = firestoreDataSource.getUserPreferences(user.uid)
+            Log.d("DramaRepository", "User cloud sync completed for ${user.displayName} (${user.email})")
+            cloudPrefs
+        } catch (e: Exception) {
+            Log.e("DramaRepository", "Error during cloud sync for user ${user.uid}", e)
+            null
+        }
+    }
+
+    suspend fun saveUserPreferencesToCloud(
+        userId: String,
+        playbackSpeed: Float,
+        isAutoPlayNext: Boolean,
+        isMuted: Boolean,
+        coins: Long = 100L
+    ) = withContext(Dispatchers.IO) {
+        if (userId.isBlank()) return@withContext
+        firestoreDataSource.saveUserPreferences(userId, playbackSpeed, isAutoPlayNext, isMuted, coins)
     }
 
     companion object {

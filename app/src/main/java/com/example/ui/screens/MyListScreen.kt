@@ -314,6 +314,23 @@ fun MyListScreen(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Filled.CloudDone,
+                                    contentDescription = null,
+                                    tint = LitoralCyanBright,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Sincronização na Nuvem Ativa (Uploads e Dados Salvos)",
+                                    color = LitoralCyanBright,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
 

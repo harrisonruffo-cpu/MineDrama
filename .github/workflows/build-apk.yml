@@ -78,33 +78,31 @@ jobs:
       - name: Organizar e Renomear APK de Saída
         run: |
           mkdir -p release-apk
-          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apk/LitoralNovelas-app-debug.apk \;
+          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apk/LitoralNovelas-v1.0.2.apk \;
           echo "APK gerado com sucesso:"
           ls -lh release-apk/
 
       - name: Salvar APK nos Artifacts do GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: LitoralNovelas-APK
-          path: release-apk/LitoralNovelas-app-debug.apk
+          name: LitoralNovelas-v1.0.2-APK
+          path: release-apk/LitoralNovelas-v1.0.2.apk
           retention-days: 30
 
       - name: Criar GitHub Release Oficial
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.create_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          files: release-apk/LitoralNovelas-app-debug.apk
-          name: Litoral Novelas ${{ github.ref_name || 'v1.0.0' }}
+          files: release-apk/LitoralNovelas-v1.0.2.apk
+          name: Litoral Novelas ${{ github.ref_name || 'v1.0.2' }}
           body: |
-            ## 🌊 Litoral Novelas - APK Oficial para Instalação
+            ## 🌊 Litoral Novelas v1.0.2 - APK Oficial para Instalação
 
-            - **Download do APK**: Baixe o arquivo `LitoralNovelas-app-debug.apk` abaixo e instale diretamente no seu aparelho Android.
-            - **Recursos**:
-              - Streaming vertical de alta performance com reprodução contínua e imersiva.
-              - Armazenamento em nuvem com Firebase Cloud Storage e Cloud Firestore para persistência global.
-              - Autenticação e sincronização com Contas Google e E-mail.
-              - Publicação direta de vídeos MP4 e capas personalizadas.
-              - Gerenciamento de histórico de visualização e favoritos salvos na nuvem.
+            - **Download do APK**: Baixe o arquivo `LitoralNovelas-v1.0.2.apk` abaixo e instale diretamente no seu aparelho Android.
+            - **Novidades da Versão 1.0.2**:
+              - ☁️ **Sincronização Total na Nuvem**: Salva todas as preferências, favoritos, histórico e episódios curtidos mesmo ao desinstalar e reinstalar o app.
+              - 🔗 **Reprodução por Link Camuflado**: Permite adicionar vídeos por URL direta camuflados no botão do episódio.
+              - 🚀 **Prevenção de Erros 403**: ExoPlayer robusto com cabeçalhos otimizados para streaming contínuo.
           draft: false
           prerelease: false
         env:

@@ -331,7 +331,7 @@ class FirestoreDramaDataSource {
     }
 
     /**
-     * Save user profile to Firestore cloud.
+     * Save user profile and preferences to Firestore cloud.
      */
     suspend fun saveUserProfile(user: com.example.data.auth.UserProfile): Boolean {
         val db = firestore ?: return false
@@ -374,6 +374,231 @@ class FirestoreDramaDataSource {
         } catch (e: Exception) {
             Log.w("FirestoreDramaDataSource", "Failed to get user profile from cloud: ${e.message}")
             null
+        }
+    }
+
+    /**
+     * Save user playback and app preferences to Firestore cloud.
+     */
+    suspend fun saveUserPreferences(
+        uid: String,
+        playbackSpeed: Float,
+        isAutoPlayNext: Boolean,
+        isMuted: Boolean,
+        coins: Long = 100L
+    ): Boolean {
+        val db = firestore ?: return false
+        return try {
+            val data = mapOf(
+                "playbackSpeed" to playbackSpeed.toDouble(),
+                "isAutoPlayNext" to isAutoPlayNext,
+                "isMuted" to isMuted,
+                "coins" to coins,
+                "updatedAt" to System.currentTimeMillis()
+            )
+            db.collection("users").document(uid)
+                .collection("settings").document("preferences")
+                .set(data, SetOptions.merge())
+                .await()
+            true
+        } catch (e: Exception) {
+            Log.w("FirestoreDramaDataSource", "Failed to save user preferences to cloud", e)
+            false
+        }
+    }
+
+    /**
+     * Fetch user playback and app preferences from Firestore cloud.
+     */
+    suspend fun getUserPreferences(uid: String): Map<String, Any>? {
+        val db = firestore ?: return null
+        return try {
+            val doc = db.collection("users").document(uid)
+                .collection("settings").document("preferences")
+                .get()
+                .await()
+            if (doc.exists()) doc.data else null
+        } catch (e: Exception) {
+            Log.w("FirestoreDramaDataSource", "Failed to get user preferences from cloud", e)
+            null
+        }
+    }
+
+    /**
+     * Save user favorites (My List) to Firestore cloud.
+     */
+    suspend fun saveUserFavorites(uid: String, favorites: List<com.example.data.local.FavoriteEntity>): Boolean {
+        val db = firestore ?: return false
+        return try {
+            val list = favorites.map { fav ->
+                mapOf(
+                    "dramaId" to fav.dramaId,
+                    "dramaTitle" to fav.dramaTitle,
+                    "posterUrl" to fav.posterUrl,
+                    "categoryName" to fav.categoryName,
+                    "rating" to fav.rating,
+                    "totalEpisodes" to fav.totalEpisodes,
+                    "addedAt" to fav.addedAt
+                )
+            }
+            db.collection("users").document(uid)
+                .collection("data").document("favorites")
+                .set(mapOf("items" to list, "updatedAt" to System.currentTimeMillis()), SetOptions.merge())
+                .await()
+            true
+        } catch (e: Exception) {
+            Log.w("FirestoreDramaDataSource", "Failed to save user favorites to cloud", e)
+            false
+        }
+    }
+
+    /**
+     * Fetch user favorites (My List) from Firestore cloud.
+     */
+    suspend fun getUserFavorites(uid: String): List<com.example.data.local.FavoriteEntity> {
+        val db = firestore ?: return emptyList()
+        return try {
+            val doc = db.collection("users").document(uid)
+                .collection("data").document("favorites")
+                .get()
+                .await()
+            if (doc.exists()) {
+                val rawItems = doc.get("items") as? List<Map<String, Any>> ?: emptyList()
+                rawItems.mapNotNull { map ->
+                    try {
+                        val dramaId = map["dramaId"] as? String ?: return@mapNotNull null
+                        val dramaTitle = map["dramaTitle"] as? String ?: ""
+                        val posterUrl = map["posterUrl"] as? String ?: ""
+                        val categoryName = map["categoryName"] as? String ?: ""
+                        val rating = (map["rating"] as? Number)?.toDouble() ?: 4.8
+                        val totalEpisodes = (map["totalEpisodes"] as? Number)?.toInt() ?: 1
+                        val addedAt = (map["addedAt"] as? Number)?.toLong() ?: System.currentTimeMillis()
+                        com.example.data.local.FavoriteEntity(
+                            dramaId = dramaId,
+                            dramaTitle = dramaTitle,
+                            posterUrl = posterUrl,
+                            categoryName = categoryName,
+                            rating = rating,
+                            totalEpisodes = totalEpisodes,
+                            addedAt = addedAt
+                        )
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+            } else emptyList()
+        } catch (e: Exception) {
+            Log.w("FirestoreDramaDataSource", "Failed to fetch user favorites from cloud", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * Save user watch history to Firestore cloud.
+     */
+    suspend fun saveUserWatchHistory(uid: String, history: List<com.example.data.local.WatchHistoryEntity>): Boolean {
+        val db = firestore ?: return false
+        return try {
+            val list = history.map { h ->
+                mapOf(
+                    "dramaId" to h.dramaId,
+                    "dramaTitle" to h.dramaTitle,
+                    "posterUrl" to h.posterUrl,
+                    "lastEpisodeNumber" to h.lastEpisodeNumber,
+                    "lastPositionMs" to h.lastPositionMs,
+                    "durationMs" to h.durationMs,
+                    "totalEpisodes" to h.totalEpisodes,
+                    "updatedAt" to h.updatedAt
+                )
+            }
+            db.collection("users").document(uid)
+                .collection("data").document("history")
+                .set(mapOf("items" to list, "updatedAt" to System.currentTimeMillis()), SetOptions.merge())
+                .await()
+            true
+        } catch (e: Exception) {
+            Log.w("FirestoreDramaDataSource", "Failed to save user history to cloud", e)
+            false
+        }
+    }
+
+    /**
+     * Fetch user watch history from Firestore cloud.
+     */
+    suspend fun getUserWatchHistory(uid: String): List<com.example.data.local.WatchHistoryEntity> {
+        val db = firestore ?: return emptyList()
+        return try {
+            val doc = db.collection("users").document(uid)
+                .collection("data").document("history")
+                .get()
+                .await()
+            if (doc.exists()) {
+                val rawItems = doc.get("items") as? List<Map<String, Any>> ?: emptyList()
+                rawItems.mapNotNull { map ->
+                    try {
+                        val dramaId = map["dramaId"] as? String ?: return@mapNotNull null
+                        val dramaTitle = map["dramaTitle"] as? String ?: ""
+                        val posterUrl = map["posterUrl"] as? String ?: ""
+                        val lastEpisodeNumber = (map["lastEpisodeNumber"] as? Number)?.toInt() ?: 1
+                        val lastPositionMs = (map["lastPositionMs"] as? Number)?.toLong() ?: 0L
+                        val durationMs = (map["durationMs"] as? Number)?.toLong() ?: 60000L
+                        val totalEpisodes = (map["totalEpisodes"] as? Number)?.toInt() ?: 1
+                        val updatedAt = (map["updatedAt"] as? Number)?.toLong() ?: System.currentTimeMillis()
+                        com.example.data.local.WatchHistoryEntity(
+                            dramaId = dramaId,
+                            dramaTitle = dramaTitle,
+                            posterUrl = posterUrl,
+                            lastEpisodeNumber = lastEpisodeNumber,
+                            lastPositionMs = lastPositionMs,
+                            durationMs = durationMs,
+                            totalEpisodes = totalEpisodes,
+                            updatedAt = updatedAt
+                        )
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+            } else emptyList()
+        } catch (e: Exception) {
+            Log.w("FirestoreDramaDataSource", "Failed to fetch user history from cloud", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * Save user liked episodes to Firestore cloud.
+     */
+    suspend fun saveUserLikedKeys(uid: String, likedKeys: List<String>): Boolean {
+        val db = firestore ?: return false
+        return try {
+            db.collection("users").document(uid)
+                .collection("data").document("likes")
+                .set(mapOf("likedKeys" to likedKeys, "updatedAt" to System.currentTimeMillis()), SetOptions.merge())
+                .await()
+            true
+        } catch (e: Exception) {
+            Log.w("FirestoreDramaDataSource", "Failed to save user likes to cloud", e)
+            false
+        }
+    }
+
+    /**
+     * Fetch user liked episodes from Firestore cloud.
+     */
+    suspend fun getUserLikedKeys(uid: String): List<String> {
+        val db = firestore ?: return emptyList()
+        return try {
+            val doc = db.collection("users").document(uid)
+                .collection("data").document("likes")
+                .get()
+                .await()
+            if (doc.exists()) {
+                @Suppress("UNCHECKED_CAST")
+                doc.get("likedKeys") as? List<String> ?: emptyList()
+            } else emptyList()
+        } catch (e: Exception) {
+            Log.w("FirestoreDramaDataSource", "Failed to fetch user likes from cloud", e)
+            emptyList()
         }
     }
 }

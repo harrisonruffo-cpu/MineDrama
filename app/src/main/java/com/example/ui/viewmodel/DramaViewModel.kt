@@ -98,6 +98,24 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
     init {
         loadCatalog()
         observeRealtimeCatalog()
+        observeCurrentUserForCloudSync()
+    }
+
+    private fun observeCurrentUserForCloudSync() {
+        viewModelScope.launch {
+            currentUser.collect { user ->
+                if (user != null && user.uid.isNotBlank()) {
+                    val cloudPrefs = repository.syncUserCloudData(user)
+                    if (cloudPrefs != null) {
+                        try {
+                            (cloudPrefs["playbackSpeed"] as? Number)?.let { _playbackSpeed.value = it.toFloat() }
+                            (cloudPrefs["isAutoPlayNext"] as? Boolean)?.let { _isAutoPlayNext.value = it }
+                            (cloudPrefs["isMuted"] as? Boolean)?.let { _isMuted.value = it }
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+        }
     }
 
     private fun observeRealtimeCatalog() {
@@ -138,6 +156,11 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
 
             if (_selectedDramaForDetail.value == null && dramas.isNotEmpty()) {
                 _selectedDramaForDetail.value = dramas.first()
+            }
+
+            // Sync user data if user is already logged in
+            currentUser.value?.let { user ->
+                repository.syncUserCloudData(user)
             }
 
             _isLoading.value = false
@@ -202,7 +225,7 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleFavorite(drama: Drama) {
         viewModelScope.launch {
-            repository.toggleFavorite(drama)
+            repository.toggleFavorite(drama, currentUser.value?.uid)
         }
     }
 
@@ -210,7 +233,7 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val key = "${dramaId}_$episodeNumber"
             val isLiked = likedKeys.value.contains(key)
-            repository.toggleLikeEpisode(dramaId, episodeNumber, isLiked)
+            repository.toggleLikeEpisode(dramaId, episodeNumber, isLiked, currentUser.value?.uid)
         }
     }
 
@@ -223,27 +246,43 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
                 episodeNumber = episodeNumber,
                 lastPositionMs = positionMs,
                 durationMs = durationMs,
-                totalEpisodes = drama.totalEpisodes
+                totalEpisodes = drama.totalEpisodes,
+                userId = currentUser.value?.uid
             )
         }
     }
 
     fun clearWatchHistory() {
         viewModelScope.launch {
-            repository.clearHistory()
+            repository.clearHistory(currentUser.value?.uid)
         }
     }
 
     fun setPlaybackSpeed(speed: Float) {
         _playbackSpeed.value = speed
+        syncPreferencesToCloud()
     }
 
     fun toggleAutoPlayNext() {
         _isAutoPlayNext.value = !_isAutoPlayNext.value
+        syncPreferencesToCloud()
     }
 
     fun toggleMute() {
         _isMuted.value = !_isMuted.value
+        syncPreferencesToCloud()
+    }
+
+    private fun syncPreferencesToCloud() {
+        val user = currentUser.value ?: return
+        viewModelScope.launch {
+            repository.saveUserPreferencesToCloud(
+                userId = user.uid,
+                playbackSpeed = _playbackSpeed.value,
+                isAutoPlayNext = _isAutoPlayNext.value,
+                isMuted = _isMuted.value
+            )
+        }
     }
 
     // --- Authentication & Account Management ---
