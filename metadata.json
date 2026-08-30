@@ -1,0 +1,6 @@
+{
+  "name": "Mine Drama",
+  "description": "Aplicativo de streaming de minisséries e novelas curtas em formato vertical com reprodução fluida e catálogo completo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

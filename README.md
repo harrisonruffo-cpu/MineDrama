@@ -1,11 +1,24 @@
-<div align="center">
+# Mine Drama - Aplicativo de Mini Dramas & Streaming Vertical
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Aplicativo Android nativo em **Kotlin** e **Jetpack Compose** para streaming de micro-dramas em formato vertical (estilo ReelShort / DramaBox / ShortMax).
 
-  <h1>Built with AI Studio</h2>
+---
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## 🚀 Compilação Automática no GitHub (CI/CD)
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+Este repositório possui uma action configurada em `.github/workflows/build-apk.yml` pronta para compilar o APK automaticamente:
 
-</div>
+1. **Acesse a aba Actions** no seu repositório do GitHub (`https://github.com/SEU_USUARIO/SEU_REPOSITORIO/actions`).
+2. Selecione o workflow **"Build Android APK"**.
+3. Clique em **"Run workflow"** (ou faça um `git push` na branch `main`).
+4. Ao finalizar a execução com sucesso, role até a seção **Artifacts** na página da execução e baixe o arquivo `mine-drama-debug-apk.zip` contendo o APK instalável (`.apk`).
+
+---
+
+## 🛠️ Tecnologias Utilizadas
+
+- **Kotlin** & **Jetpack Compose** (Material 3)
+- **Firebase Firestore** para catálogo e metadados em tempo real
+- **Media3 / ExoPlayer** para reprodução vertical de vídeos fluida
+- **Room Database** para histórico de reprodução e favoritos locais
+- **Moshi** & **Kotlin Coroutines / Flow**
