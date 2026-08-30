@@ -130,14 +130,22 @@ fun PublishDramaScreen(
     var episodeToRename by remember { mutableStateOf<Pair<Drama, com.example.data.model.Episode>?>(null) }
     var newEpisodeNameInput by remember { mutableStateOf("") }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     // Media pickers
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let {
-            posterUrl = it.toString()
+        uri?.let { pickedUri ->
             coroutineScope.launch {
-                snackbarHostState.showSnackbar("Imagem de capa selecionada com sucesso!")
+                val savedPath = com.example.data.util.MediaStorageHelper.copyUriToInternalStorage(
+                    context = context,
+                    uri = pickedUri,
+                    subfolder = "covers",
+                    prefix = "cover"
+                )
+                posterUrl = savedPath
+                snackbarHostState.showSnackbar("Imagem de capa selecionada e pronta para publicação!")
             }
         }
     }
@@ -145,10 +153,16 @@ fun PublishDramaScreen(
     val videoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let {
-            videoUrl = it.toString()
+        uri?.let { pickedUri ->
             coroutineScope.launch {
-                snackbarHostState.showSnackbar("Vídeo do dispositivo selecionado com sucesso!")
+                val savedPath = com.example.data.util.MediaStorageHelper.copyUriToInternalStorage(
+                    context = context,
+                    uri = pickedUri,
+                    subfolder = "videos",
+                    prefix = "video"
+                )
+                videoUrl = savedPath
+                snackbarHostState.showSnackbar("Vídeo importado e pronto para publicação online!")
             }
         }
     }

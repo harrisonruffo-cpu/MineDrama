@@ -279,7 +279,12 @@ fun SingleEpisodePlayerView(
     // ExoPlayer creation & lifecycle
     val exoPlayer = remember(item.episode.id) {
         ExoPlayer.Builder(context).build().apply {
-            val mediaItem = MediaItem.fromUri(Uri.parse(item.episode.videoUrl))
+            val videoUri = if (item.episode.videoUrl.startsWith("/")) {
+                Uri.fromFile(java.io.File(item.episode.videoUrl))
+            } else {
+                Uri.parse(item.episode.videoUrl)
+            }
+            val mediaItem = MediaItem.fromUri(videoUri)
             setMediaItem(mediaItem)
             repeatMode = Player.REPEAT_MODE_OFF
             prepare()

@@ -27,6 +27,7 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
 
     // Auth Flows
     val currentUser: StateFlow<UserProfile?> = authManager.currentUser
+    val savedAccounts: StateFlow<List<UserProfile>> = authManager.savedAccounts
     val isAuthenticating: StateFlow<Boolean> = authManager.isAuthenticating
     val authError: StateFlow<String?> = authManager.authError
 
@@ -242,8 +243,16 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun signInWithCustomProfile(name: String, email: String, avatarUrl: String) {
-        authManager.signInWithCustomProfile(name, email, avatarUrl)
+    fun selectAccount(account: UserProfile) {
+        authManager.selectAccount(account)
+    }
+
+    fun addAndSignInGoogleAccount(name: String, email: String, avatarUrl: String) {
+        authManager.addAndSignInGoogleAccount(name, email, avatarUrl)
+    }
+
+    fun removeSavedAccount(email: String) {
+        authManager.removeSavedAccount(email)
     }
 
     fun signOut() {
@@ -254,7 +263,6 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun switchAccount(serverClientId: String = "") {
         viewModelScope.launch {
-            authManager.signOut()
             authManager.signInWithGoogle(serverClientId)
         }
     }

@@ -1,15 +1,23 @@
-name: Build Android APK
+name: Build & Release Android APK
 
 on:
   push:
     branches: [ main, master ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Criar uma Release no GitHub com o APK anexado?'
+        required: false
+        default: 'false'
+        type: boolean
 
 jobs:
   build:
-    name: Build & Export APK
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -22,9 +30,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Prepare Secrets and Signing Files
+      - name: Prepare Android Signing & Environment
         run: |
-          # 1. Ensure debug.keystore is present and valid
+          # 1. Ensure debug.keystore is present
           if [ -f "debug.keystore.base64" ]; then
             base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || base64 --decode debug.keystore.base64 > debug.keystore 2>/dev/null || true
           fi
@@ -48,23 +56,49 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Debug APK with Gradle
-        env:
-          JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8 -Dksp.use.ksp2=true"
+      - name: Grant execute permission for gradlew
         run: |
           if [ ! -f "gradlew" ]; then
             gradle wrapper || true
           fi
           chmod +x gradlew 2>/dev/null || true
+
+      - name: Build APK with Gradle
+        env:
+          JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8 -Dksp.use.ksp2=true"
+        run: |
           if [ -f "gradlew" ]; then
             ./gradlew :app:assembleDebug --stacktrace -Dorg.gradle.configuration-cache=false -Dksp.use.ksp2=true -Dksp.run.in.process=false
           else
             gradle :app:assembleDebug --stacktrace -Dorg.gradle.configuration-cache=false -Dksp.use.ksp2=true -Dksp.run.in.process=false
           fi
 
-      - name: Upload Debug APK Artifact
+      - name: Organize & Rename Output APK
+        run: |
+          mkdir -p release-apk
+          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apk/MineDrama-app-debug.apk \;
+          echo "APK gerado com sucesso:"
+          ls -lh release-apk/
+
+      - name: Upload APK to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: mine-drama-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-          retention-days: 14
+          name: MineDrama-APK
+          path: release-apk/MineDrama-app-debug.apk
+          retention-days: 30
+
+      - name: Create GitHub Release (Optional / On Tag or Input)
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.create_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-apk/MineDrama-app-debug.apk
+          name: Release ${{ github.ref_name || 'v1.0.0' }}
+          body: |
+            ## 📱 Mine Drama - APK Pronto para Instalação
+
+            - **Download do APK**: Baixe o arquivo `MineDrama-app-debug.apk` abaixo e instale diretamente no seu dispositivo Android.
+            - **Recursos**: Streaming vertical em alta resolução, publicação online e local de novelas e suporte a contas Google.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

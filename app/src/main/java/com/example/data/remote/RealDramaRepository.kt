@@ -1,9 +1,11 @@
 package com.example.data.remote
 
 import android.content.Context
+import android.util.Log
 import com.example.data.local.AppDatabase
 import com.example.data.local.FavoriteEntity
 import com.example.data.local.LikedEpisodeEntity
+import com.example.data.local.LocalPublishedDramaStore
 import com.example.data.local.WatchHistoryEntity
 import com.example.data.model.Drama
 import com.example.data.model.DramaCategory
@@ -25,14 +27,15 @@ class DramaRepository(context: Context) {
 
     private val dramaDao = AppDatabase.getDatabase(context).dramaDao()
     private val firestoreDataSource = FirestoreDramaDataSource()
+    private val localPublishedStore = LocalPublishedDramaStore(context)
 
     private val moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
         .build()
 
     private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
         .addInterceptor(HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BASIC
         })
@@ -46,7 +49,7 @@ class DramaRepository(context: Context) {
         .create(DramaApiService::class.java)
 
     // In-memory cache of current loaded catalog
-    private var cachedDramas: List<Drama> = getCuratedRealDramas()
+    private var cachedDramas: List<Drama> = emptyList()
 
     /**
      * Real-time stream of catalog updates directly from Firebase Firestore.
@@ -58,38 +61,58 @@ class DramaRepository(context: Context) {
             return@withContext cachedDramas
         }
 
+        val localUserDramas = localPublishedStore.getAllPublishedDramas()
+        val combined = mutableListOf<Drama>()
+        combined.addAll(localUserDramas)
+
         // 1. Try Firebase Firestore first
         try {
             val firestoreDramas = firestoreDataSource.fetchDramasOnce()
             if (firestoreDramas.isNotEmpty()) {
-                cachedDramas = firestoreDramas
+                for (d in firestoreDramas) {
+                    if (combined.none { it.id == d.id }) {
+                        combined.add(d)
+                    }
+                }
+                cachedDramas = combined
                 return@withContext cachedDramas
             }
-        } catch (_: Exception) {
-            // Firestore not ready or network offline, proceed to fallback
+        } catch (e: Exception) {
+            Log.w("DramaRepository", "Firestore fetch returned: ${e.message}")
         }
 
         // 2. Try REST API
         try {
             val response = apiService.getDramasCatalog()
             if (response.isSuccessful && !response.body().isNullOrEmpty()) {
-                cachedDramas = response.body()!!
-                // Synchronize and seed to Firestore in background if empty
-                firestoreDataSource.seedCatalog(cachedDramas)
+                val apiDramas = response.body()!!
+                for (d in apiDramas) {
+                    if (combined.none { it.id == d.id }) {
+                        combined.add(d)
+                    }
+                }
+                cachedDramas = combined
+                try {
+                    firestoreDataSource.seedCatalog(apiDramas)
+                } catch (_: Exception) {}
                 return@withContext cachedDramas
             }
-        } catch (_: Exception) {
-            // Fallback to verified curated online media catalog
+        } catch (e: Exception) {
+            Log.w("DramaRepository", "REST API fetch returned: ${e.message}")
         }
 
-        // 3. Fallback to curated catalog & seed to Firestore
+        // 3. Fallback to curated catalog
         val curated = getCuratedRealDramas()
-        cachedDramas = curated
+        for (d in curated) {
+            if (combined.none { it.id == d.id }) {
+                combined.add(d)
+            }
+        }
+        cachedDramas = combined
         try {
             firestoreDataSource.seedCatalog(curated)
-        } catch (_: Exception) {
-            // Ignore seed failure if offline
-        }
+        } catch (_: Exception) {}
+
         cachedDramas
     }
 
@@ -125,51 +148,67 @@ class DramaRepository(context: Context) {
     }
 
     suspend fun publishOrUpdateDrama(drama: Drama): Boolean = withContext(Dispatchers.IO) {
-        val success = firestoreDataSource.publishOrUpdateDrama(drama)
-        if (success) {
-            // Update local cached list
-            val updated = cachedDramas.filterNot { it.id == drama.id }.toMutableList()
-            updated.add(0, drama)
-            cachedDramas = updated
+        // Save locally first so it's guaranteed to be available
+        localPublishedStore.saveOrUpdateDrama(drama)
+
+        val updated = cachedDramas.filterNot { it.id == drama.id }.toMutableList()
+        updated.add(0, drama)
+        cachedDramas = updated
+
+        // Push to Firestore in parallel/online
+        try {
+            firestoreDataSource.publishOrUpdateDrama(drama)
+        } catch (e: Exception) {
+            Log.w("DramaRepository", "Firestore publish sync failed: ${e.message}")
         }
-        success
+        true
     }
 
     suspend fun deleteDrama(dramaId: String): Boolean = withContext(Dispatchers.IO) {
-        val success = firestoreDataSource.deleteDrama(dramaId)
-        if (success) {
-            cachedDramas = cachedDramas.filterNot { it.id == dramaId }
+        localPublishedStore.deleteDrama(dramaId)
+        cachedDramas = cachedDramas.filterNot { it.id == dramaId }
+        try {
+            firestoreDataSource.deleteDrama(dramaId)
+        } catch (e: Exception) {
+            Log.w("DramaRepository", "Firestore delete sync failed: ${e.message}")
         }
-        success
+        true
     }
 
     suspend fun renameEpisode(dramaId: String, episodeId: String, newTitle: String): Boolean = withContext(Dispatchers.IO) {
-        val success = firestoreDataSource.renameEpisode(dramaId, episodeId, newTitle)
-        if (success) {
-            cachedDramas = cachedDramas.map { drama ->
-                if (drama.id == dramaId) {
-                    drama.copy(
-                        episodes = drama.episodes.map { ep ->
-                            if (ep.id == episodeId) ep.copy(title = newTitle) else ep
-                        }
-                    )
-                } else drama
-            }
+        localPublishedStore.renameEpisode(dramaId, episodeId, newTitle)
+        cachedDramas = cachedDramas.map { drama ->
+            if (drama.id == dramaId) {
+                drama.copy(
+                    episodes = drama.episodes.map { ep ->
+                        if (ep.id == episodeId) ep.copy(title = newTitle) else ep
+                    }
+                )
+            } else drama
         }
-        success
+        try {
+            firestoreDataSource.renameEpisode(dramaId, episodeId, newTitle)
+        } catch (e: Exception) {
+            Log.w("DramaRepository", "Firestore rename episode failed: ${e.message}")
+        }
+        true
     }
 
     suspend fun renameDrama(dramaId: String, newTitle: String): Boolean = withContext(Dispatchers.IO) {
-        val success = firestoreDataSource.renameDrama(dramaId, newTitle)
-        if (success) {
-            cachedDramas = cachedDramas.map { drama ->
-                if (drama.id == dramaId) drama.copy(title = newTitle) else drama
-            }
+        localPublishedStore.renameDrama(dramaId, newTitle)
+        cachedDramas = cachedDramas.map { drama ->
+            if (drama.id == dramaId) drama.copy(title = newTitle) else drama
         }
-        success
+        try {
+            firestoreDataSource.renameDrama(dramaId, newTitle)
+        } catch (e: Exception) {
+            Log.w("DramaRepository", "Firestore rename drama failed: ${e.message}")
+        }
+        true
     }
 
     suspend fun addEpisodeToDrama(dramaId: String, newEpisode: Episode): Boolean = withContext(Dispatchers.IO) {
+        localPublishedStore.addEpisode(dramaId, newEpisode)
         val drama = getDramaById(dramaId) ?: return@withContext false
         val updatedEpisodes = drama.episodes.toMutableList().apply { add(newEpisode) }
         val updatedDrama = drama.copy(

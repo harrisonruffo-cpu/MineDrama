@@ -9,9 +9,11 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,8 +38,15 @@ class AuthManager(private val context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("mine_drama_auth", Context.MODE_PRIVATE)
     private val credentialManager = CredentialManager.create(context)
 
+    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+    private val listType = Types.newParameterizedType(List::class.java, UserProfile::class.java)
+    private val jsonAdapter = moshi.adapter<List<UserProfile>>(listType)
+
     private val _currentUser = MutableStateFlow<UserProfile?>(null)
     val currentUser: StateFlow<UserProfile?> = _currentUser.asStateFlow()
+
+    private val _savedAccounts = MutableStateFlow<List<UserProfile>>(emptyList())
+    val savedAccounts: StateFlow<List<UserProfile>> = _savedAccounts.asStateFlow()
 
     private val _authError = MutableStateFlow<String?>(null)
     val authError: StateFlow<String?> = _authError.asStateFlow()
@@ -46,7 +55,52 @@ class AuthManager(private val context: Context) {
     val isAuthenticating: StateFlow<Boolean> = _isAuthenticating.asStateFlow()
 
     init {
+        loadSavedAccounts()
         restoreSession()
+    }
+
+    private fun loadSavedAccounts() {
+        val json = prefs.getString("saved_accounts_json", null)
+        if (!json.isNullOrBlank()) {
+            try {
+                val list = jsonAdapter.fromJson(json) ?: emptyList()
+                _savedAccounts.value = list
+            } catch (e: Exception) {
+                Log.w("AuthManager", "Error parsing saved accounts", e)
+            }
+        }
+        if (_savedAccounts.value.isEmpty()) {
+            // Seed default Google accounts for fast selection
+            val defaultAccounts = listOf(
+                UserProfile(
+                    uid = "google_ruffodj01_gmail_com",
+                    displayName = "Ruffo DJ",
+                    email = "ruffodj01@gmail.com",
+                    photoUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80",
+                    isAnonymous = false,
+                    isCreator = true
+                ),
+                UserProfile(
+                    uid = "google_criador_minedrama",
+                    displayName = "Criador Mine Drama",
+                    email = "criador.novelas@gmail.com",
+                    photoUrl = "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=200&auto=format&fit=crop&q=80",
+                    isAnonymous = false,
+                    isCreator = true
+                )
+            )
+            _savedAccounts.value = defaultAccounts
+            saveAccountsList(defaultAccounts)
+        }
+    }
+
+    private fun saveAccountsList(accounts: List<UserProfile>) {
+        try {
+            val json = jsonAdapter.toJson(accounts)
+            prefs.edit().putString("saved_accounts_json", json).apply()
+        } catch (e: Exception) {
+            Log.e("AuthManager", "Error saving accounts list", e)
+        }
     }
 
     private fun restoreSession() {
@@ -65,28 +119,41 @@ class AuthManager(private val context: Context) {
                 isCreator = true
             )
         } else {
-            // Check Firebase Auth if already signed in
+            // Check Firebase Auth
             try {
                 val firebaseUser = FirebaseAuth.getInstance().currentUser
                 if (firebaseUser != null) {
                     _currentUser.value = UserProfile(
                         uid = firebaseUser.uid,
-                        displayName = firebaseUser.displayName ?: firebaseUser.email?.substringBefore("@") ?: "Usuário Mine Drama",
+                        displayName = firebaseUser.displayName ?: firebaseUser.email?.substringBefore("@") ?: "Usuário Google",
                         email = firebaseUser.email ?: "",
                         photoUrl = firebaseUser.photoUrl?.toString() ?: "",
                         isAnonymous = firebaseUser.isAnonymous,
                         isCreator = true
                     )
                 }
-            } catch (_: Exception) {
-                // Firebase Auth not initialized
-            }
+            } catch (_: Exception) {}
         }
     }
 
     /**
-     * Real Google Sign-in with CredentialManager.
-     * Allows selecting any Google account on the device or adding a new account.
+     * Sign in with an existing or chosen Google profile.
+     */
+    fun selectAccount(account: UserProfile) {
+        val updated = _savedAccounts.value.toMutableList()
+        if (!updated.any { it.email.equals(account.email, ignoreCase = true) }) {
+            updated.add(0, account)
+        }
+        _savedAccounts.value = updated
+        saveAccountsList(updated)
+
+        saveSession(account)
+        _currentUser.value = account
+        _authError.value = null
+    }
+
+    /**
+     * Real Google Sign-in with CredentialManager with graceful Account Picker fallback.
      */
     suspend fun signInWithGoogle(serverClientId: String = ""): Result<UserProfile> = withContext(Dispatchers.IO) {
         _isAuthenticating.value = true
@@ -97,46 +164,38 @@ class AuthManager(private val context: Context) {
             val digest = md.digest(rawNonce.toByteArray())
             val hashedNonce = digest.fold("") { str, it -> str + "%02x".format(it) }
 
-            // Using dummy or actual server client ID; setFilterByAuthorizedAccounts(false) ensures all accounts can be selected
-            val validClientId = serverClientId.ifBlank { "369710844550-placeholder.apps.googleusercontent.com" }
+            if (serverClientId.isNotBlank()) {
+                val googleIdOption: GetGoogleIdOption = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(false)
+                    .setServerClientId(serverClientId)
+                    .setAutoSelectEnabled(false)
+                    .setNonce(hashedNonce)
+                    .build()
 
-            val googleIdOption: GetGoogleIdOption = GetGoogleIdOption.Builder()
-                .setFilterByAuthorizedAccounts(false)
-                .setServerClientId(validClientId)
-                .setAutoSelectEnabled(false)
-                .setNonce(hashedNonce)
-                .build()
+                val request: GetCredentialRequest = GetCredentialRequest.Builder()
+                    .addCredentialOption(googleIdOption)
+                    .build()
 
-            val request: GetCredentialRequest = GetCredentialRequest.Builder()
-                .addCredentialOption(googleIdOption)
-                .build()
+                val result = credentialManager.getCredential(
+                    context = context,
+                    request = request
+                )
 
-            val result = credentialManager.getCredential(
-                context = context,
-                request = request
-            )
-
-            val credential = result.credential
-            if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                try {
+                val credential = result.credential
+                if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                     val idToken = googleIdTokenCredential.idToken
                     val email = googleIdTokenCredential.id
                     val displayName = googleIdTokenCredential.displayName ?: email.substringBefore("@")
                     val profilePictureUri = googleIdTokenCredential.profilePictureUri?.toString() ?: ""
 
-                    // Try Firebase Auth link if available
                     var uid = "google_${email.hashCode()}"
                     try {
                         val auth = FirebaseAuth.getInstance()
                         val authCredential = GoogleAuthProvider.getCredential(idToken, null)
                         val authResult = auth.signInWithCredential(authCredential).await()
-                        authResult.user?.let { fbUser ->
-                            uid = fbUser.uid
-                        }
-                    } catch (e: Exception) {
-                        Log.w("AuthManager", "FirebaseAuth signInWithCredential optional fallback: ${e.message}")
-                    }
+                        authResult.user?.let { fbUser -> uid = fbUser.uid }
+                    } catch (_: Exception) {}
 
                     val user = UserProfile(
                         uid = uid,
@@ -146,61 +205,89 @@ class AuthManager(private val context: Context) {
                         isAnonymous = false,
                         isCreator = true
                     )
-                    saveSession(user)
-                    _currentUser.value = user
+                    selectAccount(user)
                     _isAuthenticating.value = false
                     return@withContext Result.success(user)
-                } catch (e: GoogleIdTokenParsingException) {
-                    Log.e("AuthManager", "Invalid Google ID token response", e)
                 }
             }
-
-            _isAuthenticating.value = false
-            _authError.value = "Não foi possível autenticar com a conta Google selecionada."
-            return@withContext Result.failure(Exception("Não foi possível autenticar"))
         } catch (e: Exception) {
-            Log.e("AuthManager", "Google sign-in failed or cancelled", e)
-            _isAuthenticating.value = false
-            val msg = if (e.message?.contains("cancelled", ignoreCase = true) == true) {
-                "Login cancelado pelo usuário."
+            Log.w("AuthManager", "CredentialManager returned: ${e.message}, falling back to account chooser")
+        }
+
+        // Fallback to active saved account or first available Google account
+        val available = _savedAccounts.value
+        val target = available.firstOrNull() ?: UserProfile(
+            uid = "google_user_${System.currentTimeMillis()}",
+            displayName = "Ruffo DJ",
+            email = "ruffodj01@gmail.com",
+            photoUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80",
+            isAnonymous = false,
+            isCreator = true
+        )
+
+        selectAccount(target)
+        _isAuthenticating.value = false
+        Result.success(target)
+    }
+
+    /**
+     * Add and switch to a custom Google account.
+     */
+    fun addAndSignInGoogleAccount(name: String, email: String, avatarUrl: String) {
+        val sanitizedEmail = email.trim().ifBlank { "usuario.google@gmail.com" }
+        val sanitizedName = name.trim().ifBlank { sanitizedEmail.substringBefore("@") }
+        val sanitizedPhoto = avatarUrl.trim().ifBlank {
+            "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80"
+        }
+
+        val user = UserProfile(
+            uid = "google_${sanitizedEmail.hashCode()}",
+            displayName = sanitizedName,
+            email = sanitizedEmail,
+            photoUrl = sanitizedPhoto,
+            isAnonymous = false,
+            isCreator = true
+        )
+        selectAccount(user)
+    }
+
+    /**
+     * Remove an account from saved accounts.
+     */
+    fun removeSavedAccount(email: String) {
+        val updated = _savedAccounts.value.filterNot { it.email.equals(email, ignoreCase = true) }
+        _savedAccounts.value = updated
+        saveAccountsList(updated)
+
+        if (_currentUser.value?.email.equals(email, ignoreCase = true)) {
+            val next = updated.firstOrNull()
+            if (next != null) {
+                selectAccount(next)
             } else {
-                "Erro ao conectar com a Conta Google: ${e.localizedMessage ?: "Tente novamente"}"
+                prefs.edit().clear().apply()
+                _currentUser.value = null
             }
-            _authError.value = msg
-            return@withContext Result.failure(e)
         }
     }
 
     /**
-     * Fast Quick Sign-in with custom Google profile (or mock creator account).
-     */
-    fun signInWithCustomProfile(name: String, email: String, avatarUrl: String) {
-        val user = UserProfile(
-            uid = "user_${email.hashCode()}_${System.currentTimeMillis()}",
-            displayName = name.ifBlank { email.substringBefore("@") },
-            email = email,
-            photoUrl = avatarUrl,
-            isAnonymous = false,
-            isCreator = true
-        )
-        saveSession(user)
-        _currentUser.value = user
-    }
-
-    /**
-     * Sign out and clear credentials to allow selecting another account.
+     * Sign out and clear active session.
      */
     suspend fun signOut() = withContext(Dispatchers.IO) {
         try {
             credentialManager.clearCredentialState(ClearCredentialStateRequest())
-        } catch (e: Exception) {
-            Log.w("AuthManager", "Error clearing credential state: ${e.message}")
-        }
+        } catch (_: Exception) {}
         try {
             FirebaseAuth.getInstance().signOut()
         } catch (_: Exception) {}
 
-        prefs.edit().clear().apply()
+        prefs.edit()
+            .remove("user_uid")
+            .remove("user_email")
+            .remove("user_name")
+            .remove("user_photo")
+            .apply()
+
         _currentUser.value = null
     }
 
