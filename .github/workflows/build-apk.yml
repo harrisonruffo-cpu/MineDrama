@@ -45,6 +45,16 @@ jobs:
           GOOGLE_API_KEY=DEFAULT_GOOGLE_API_KEY
           EOF
 
+      - name: Setup Gradle Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
       - name: Build Debug APK with Gradle
         env:
           JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"

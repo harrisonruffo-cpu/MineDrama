@@ -71,20 +71,110 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.TextTertiary
 
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.GTranslate
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.res.painterResource
+import com.example.data.auth.UserProfile
+import com.example.ui.viewmodel.DramaViewModel
+
 @Composable
 fun MyListScreen(
-    watchHistory: List<WatchHistoryEntity>,
-    favorites: List<FavoriteEntity>,
-    likedKeys: Set<String>,
-    allDramas: List<Drama>,
+    viewModel: DramaViewModel,
     onPlayEpisode: (String, Int) -> Unit,
     onDramaClick: (Drama) -> Unit,
-    onClearHistory: () -> Unit,
     onExploreClick: () -> Unit,
+    onNavigateToUpload: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val watchHistory by viewModel.watchHistory.collectAsState()
+    val favorites by viewModel.favorites.collectAsState()
+    val likedKeys by viewModel.likedKeys.collectAsState()
+    val allDramas by viewModel.allDramas.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
+    val isAuthenticating by viewModel.isAuthenticating.collectAsState()
+    val authError by viewModel.authError.collectAsState()
+
     var selectedTab by remember { mutableIntStateOf(0) }
     var showClearDialog by remember { mutableStateOf(false) }
+    var showQuickAccountDialog by remember { mutableStateOf(false) }
+
+    var customName by remember { mutableStateOf("") }
+    var customEmail by remember { mutableStateOf("") }
+
+    if (showQuickAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { showQuickAccountDialog = false },
+            title = { Text("Trocar / Definir Perfil Criador", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Informe o nome e email do perfil:", color = TextSecondary, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = customName,
+                        onValueChange = { customName = it },
+                        label = { Text("Nome do Criador") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = DramaCrimsonBright,
+                            unfocusedBorderColor = DarkSurfaceHighlight,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = customEmail,
+                        onValueChange = { customEmail = it },
+                        label = { Text("Email Google") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = DramaCrimsonBright,
+                            unfocusedBorderColor = DarkSurfaceHighlight,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (customEmail.isNotBlank()) {
+                            viewModel.signInWithCustomProfile(
+                                name = customName.ifBlank { "Criador Mine Drama" },
+                                email = customEmail.trim(),
+                                avatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80"
+                            )
+                            showQuickAccountDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson)
+                ) {
+                    Text("Confirmar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showQuickAccountDialog = false }) {
+                    Text("Cancelar", color = TextSecondary)
+                }
+            },
+            containerColor = DarkSurfaceElevated
+        )
+    }
 
     if (showClearDialog) {
         AlertDialog(
@@ -107,7 +197,7 @@ fun MyListScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        onClearHistory()
+                        viewModel.clearWatchHistory()
                         showClearDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson)
@@ -129,37 +219,188 @@ fun MyListScreen(
             .fillMaxSize()
             .background(DarkBackground)
     ) {
-        // Top Header
-        Row(
+        // User Profile & Google Sign-In Card
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 40.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(top = 36.dp, start = 16.dp, end = 16.dp, bottom = 12.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated)
         ) {
-            Text(
-                text = "Minha Lista",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-            )
+            Column(modifier = Modifier.padding(16.dp)) {
+                if (currentUser == null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(DarkSurfaceHighlight),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(32.dp))
+                        }
 
-            if (selectedTab == 0 && watchHistory.isNotEmpty()) {
-                IconButton(
-                    onClick = { showClearDialog = true },
-                    modifier = Modifier.testTag("clear_history_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.DeleteOutline,
-                        contentDescription = "Limpar Histórico",
-                        tint = TextSecondary
-                    )
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Faça Login com sua Conta Google",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                            )
+                            Text(
+                                text = "Publique novelas, sincronize seus favoritos e comente",
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.signInWithGoogle() },
+                            enabled = !isAuthenticating,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4285F4)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f).testTag("google_signin_button")
+                        ) {
+                            if (isAuthenticating) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Conectando...", fontSize = 12.sp, color = Color.White)
+                            } else {
+                                Icon(Icons.Filled.Person, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Entrar com Google", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = { showQuickAccountDialog = true },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("custom_profile_button")
+                        ) {
+                            Text("Outra Conta", fontSize = 12.sp, color = TextPrimary)
+                        }
+                    }
+
+                    if (authError != null) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = authError ?: "",
+                            color = DramaCrimsonBright,
+                            fontSize = 11.sp
+                        )
+                    }
+                } else {
+                    val user = currentUser!!
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (user.photoUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = user.photoUrl,
+                                contentDescription = user.displayName,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .border(2.dp, DramaGold, CircleShape)
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(DramaCrimson),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = user.displayName.take(1).uppercase(),
+                                    color = Color.White,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = user.displayName,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(DramaGold.copy(alpha = 0.2f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text("PRO", color = DramaGold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            Text(
+                                text = user.email,
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Switch account button
+                        Button(
+                            onClick = { viewModel.switchAccount() },
+                            colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceHighlight),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f).testTag("switch_account_button")
+                        ) {
+                            Icon(Icons.Filled.SwapHoriz, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Trocar Conta Google", fontSize = 12.sp, color = TextPrimary)
+                        }
+
+                        // Logout button
+                        OutlinedButton(
+                            onClick = { viewModel.signOut() },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("signout_button")
+                        ) {
+                            Icon(Icons.Filled.ExitToApp, contentDescription = null, tint = DramaCrimsonBright, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Sair", fontSize = 12.sp, color = DramaCrimsonBright)
+                        }
+                    }
                 }
             }
         }
 
-        // Tabs
+        // Top Navigation Tabs for List
+        val userDramas = allDramas.filter { it.authorId.isNotBlank() && it.authorId == currentUser?.uid || it.id.startsWith("drama_user_") }
+
         TabRow(
             selectedTabIndex = selectedTab,
             containerColor = DarkSurface,
@@ -177,22 +418,13 @@ fun MyListScreen(
                 selected = selectedTab == 0,
                 onClick = { selectedTab = 0 },
                 text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Filled.History,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (selectedTab == 0) DramaCrimsonBright else TextSecondary
+                    Text(
+                        text = "Histórico (${watchHistory.size})",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selectedTab == 0) Color.White else TextSecondary
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Histórico (${watchHistory.size})",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selectedTab == 0) Color.White else TextSecondary
-                            )
-                        )
-                    }
+                    )
                 }
             )
 
@@ -200,22 +432,13 @@ fun MyListScreen(
                 selected = selectedTab == 1,
                 onClick = { selectedTab = 1 },
                 text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Filled.Bookmark,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (selectedTab == 1) DramaCrimsonBright else TextSecondary
+                    Text(
+                        text = "Favoritos (${favorites.size})",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selectedTab == 1) Color.White else TextSecondary
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Favoritos (${favorites.size})",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selectedTab == 1) Color.White else TextSecondary
-                            )
-                        )
-                    }
+                    )
                 }
             )
 
@@ -223,22 +446,27 @@ fun MyListScreen(
                 selected = selectedTab == 2,
                 onClick = { selectedTab = 2 },
                 text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Filled.Favorite,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (selectedTab == 2) DramaCrimsonBright else TextSecondary
+                    Text(
+                        text = "Curtidos (${likedKeys.size})",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selectedTab == 2) Color.White else TextSecondary
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Curtidos (${likedKeys.size})",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selectedTab == 2) Color.White else TextSecondary
-                            )
+                    )
+                }
+            )
+
+            Tab(
+                selected = selectedTab == 3,
+                onClick = { selectedTab = 3 },
+                text = {
+                    Text(
+                        text = "Uploads (${userDramas.size})",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selectedTab == 3) DramaGold else TextSecondary
                         )
-                    }
+                    )
                 }
             )
         }
@@ -262,6 +490,88 @@ fun MyListScreen(
                 onPlayEpisode = onPlayEpisode,
                 onExploreClick = onExploreClick
             )
+            3 -> {
+                if (userDramas.isEmpty()) {
+                    EmptyListState(
+                        icon = Icons.Filled.CloudUpload,
+                        title = "Nenhum vídeo publicado ainda",
+                        subtitle = "Publique suas próprias minisséries com capas e vídeos para toda a comunidade assistir.",
+                        buttonText = "Publicar Novo Vídeo",
+                        onButtonClick = onNavigateToUpload
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(userDramas) { drama ->
+                            Card(
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onDramaClick(drama) }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(70.dp)
+                                            .aspectRatio(0.72f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                    ) {
+                                        AsyncImage(
+                                            model = drama.posterUrl,
+                                            contentDescription = drama.title,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = drama.title,
+                                            style = MaterialTheme.typography.titleMedium.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                color = TextPrimary
+                                            ),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "${drama.category.displayName} • ${drama.episodes.size} episódios",
+                                            color = DramaGold,
+                                            fontSize = 12.sp
+                                        )
+                                        Text(
+                                            text = "Status: Publicado Online",
+                                            color = DramaCrimsonBright,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    Button(
+                                        onClick = { onNavigateToUpload() },
+                                        colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceHighlight),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text("Gerenciar", fontSize = 11.sp, color = TextPrimary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -124,6 +124,61 @@ class DramaRepository(context: Context) {
         }
     }
 
+    suspend fun publishOrUpdateDrama(drama: Drama): Boolean = withContext(Dispatchers.IO) {
+        val success = firestoreDataSource.publishOrUpdateDrama(drama)
+        if (success) {
+            // Update local cached list
+            val updated = cachedDramas.filterNot { it.id == drama.id }.toMutableList()
+            updated.add(0, drama)
+            cachedDramas = updated
+        }
+        success
+    }
+
+    suspend fun deleteDrama(dramaId: String): Boolean = withContext(Dispatchers.IO) {
+        val success = firestoreDataSource.deleteDrama(dramaId)
+        if (success) {
+            cachedDramas = cachedDramas.filterNot { it.id == dramaId }
+        }
+        success
+    }
+
+    suspend fun renameEpisode(dramaId: String, episodeId: String, newTitle: String): Boolean = withContext(Dispatchers.IO) {
+        val success = firestoreDataSource.renameEpisode(dramaId, episodeId, newTitle)
+        if (success) {
+            cachedDramas = cachedDramas.map { drama ->
+                if (drama.id == dramaId) {
+                    drama.copy(
+                        episodes = drama.episodes.map { ep ->
+                            if (ep.id == episodeId) ep.copy(title = newTitle) else ep
+                        }
+                    )
+                } else drama
+            }
+        }
+        success
+    }
+
+    suspend fun renameDrama(dramaId: String, newTitle: String): Boolean = withContext(Dispatchers.IO) {
+        val success = firestoreDataSource.renameDrama(dramaId, newTitle)
+        if (success) {
+            cachedDramas = cachedDramas.map { drama ->
+                if (drama.id == dramaId) drama.copy(title = newTitle) else drama
+            }
+        }
+        success
+    }
+
+    suspend fun addEpisodeToDrama(dramaId: String, newEpisode: Episode): Boolean = withContext(Dispatchers.IO) {
+        val drama = getDramaById(dramaId) ?: return@withContext false
+        val updatedEpisodes = drama.episodes.toMutableList().apply { add(newEpisode) }
+        val updatedDrama = drama.copy(
+            episodes = updatedEpisodes,
+            totalEpisodes = updatedEpisodes.size
+        )
+        publishOrUpdateDrama(updatedDrama)
+    }
+
     suspend fun getAllPlaybackItems(): List<PlaybackEpisodeItem> = withContext(Dispatchers.IO) {
         val dramas = getDramas()
         val list = mutableListOf<PlaybackEpisodeItem>()

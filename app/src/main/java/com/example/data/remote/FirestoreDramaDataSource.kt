@@ -34,7 +34,10 @@ data class DramaFirestoreDto(
     val isTop10: Boolean = false,
     val topRank: Int? = null,
     val tags: List<String> = emptyList(),
-    val episodes: List<EpisodeFirestoreDto> = emptyList()
+    val episodes: List<EpisodeFirestoreDto> = emptyList(),
+    val authorId: String = "",
+    val authorName: String = "",
+    val authorPhotoUrl: String = ""
 )
 
 data class EpisodeFirestoreDto(
@@ -47,7 +50,8 @@ data class EpisodeFirestoreDto(
     val thumbnailUrl: String = "",
     val synopsis: String = "",
     val isFree: Boolean = true,
-    val likesCount: Long = 0L
+    val likesCount: Long = 0L,
+    val uploadedAt: Long = 0L
 )
 
 fun DramaFirestoreDto.toDomain(): Drama {
@@ -63,7 +67,7 @@ fun DramaFirestoreDto.toDomain(): Drama {
         synopsis = synopsis,
         category = dramaCategory,
         posterUrl = posterUrl,
-        bannerUrl = bannerUrl,
+        bannerUrl = bannerUrl.ifBlank { posterUrl },
         rating = if (rating <= 0) 4.8 else rating,
         views = views,
         likes = likes,
@@ -75,13 +79,16 @@ fun DramaFirestoreDto.toDomain(): Drama {
         isTop10 = isTop10,
         topRank = topRank,
         tags = tags,
-        episodes = episodes.map { it.toDomain() }
+        episodes = episodes.map { it.toDomain() },
+        authorId = authorId,
+        authorName = authorName,
+        authorPhotoUrl = authorPhotoUrl
     )
 }
 
 fun EpisodeFirestoreDto.toDomain(): Episode {
     return Episode(
-        id = id,
+        id = id.ifBlank { "${dramaId}_ep_$episodeNumber" },
         dramaId = dramaId,
         episodeNumber = episodeNumber,
         title = title,
@@ -90,7 +97,8 @@ fun EpisodeFirestoreDto.toDomain(): Episode {
         thumbnailUrl = thumbnailUrl,
         synopsis = synopsis,
         isFree = isFree,
-        likesCount = likesCount
+        likesCount = likesCount,
+        uploadedAt = if (uploadedAt <= 0) System.currentTimeMillis() else uploadedAt
     )
 }
 
@@ -114,7 +122,10 @@ fun Drama.toFirestoreDto(): DramaFirestoreDto {
         isTop10 = isTop10,
         topRank = topRank,
         tags = tags,
-        episodes = episodes.map { it.toFirestoreDto() }
+        episodes = episodes.map { it.toFirestoreDto() },
+        authorId = authorId,
+        authorName = authorName,
+        authorPhotoUrl = authorPhotoUrl
     )
 }
 
@@ -129,7 +140,8 @@ fun Episode.toFirestoreDto(): EpisodeFirestoreDto {
         thumbnailUrl = thumbnailUrl,
         synopsis = synopsis,
         isFree = isFree,
-        likesCount = likesCount
+        likesCount = likesCount,
+        uploadedAt = uploadedAt
     )
 }
 
@@ -204,6 +216,73 @@ class FirestoreDramaDataSource {
         } catch (e: Exception) {
             Log.w("FirestoreDramaDataSource", "Error fetching dramas from Firestore", e)
             emptyList()
+        }
+    }
+
+    /**
+     * Publish or update drama and its episodes in Firestore.
+     */
+    suspend fun publishOrUpdateDrama(drama: Drama): Boolean {
+        val db = firestore ?: return false
+        return try {
+            val dto = drama.toFirestoreDto()
+            db.collection("dramas").document(drama.id)
+                .set(dto, SetOptions.merge())
+                .await()
+            Log.d("FirestoreDramaDataSource", "Successfully saved drama ${drama.id} - ${drama.title}")
+            true
+        } catch (e: Exception) {
+            Log.e("FirestoreDramaDataSource", "Error saving drama ${drama.id}", e)
+            false
+        }
+    }
+
+    /**
+     * Delete drama from Firestore.
+     */
+    suspend fun deleteDrama(dramaId: String): Boolean {
+        val db = firestore ?: return false
+        return try {
+            db.collection("dramas").document(dramaId).delete().await()
+            Log.d("FirestoreDramaDataSource", "Successfully deleted drama $dramaId")
+            true
+        } catch (e: Exception) {
+            Log.e("FirestoreDramaDataSource", "Error deleting drama $dramaId", e)
+            false
+        }
+    }
+
+    /**
+     * Rename an episode in a drama.
+     */
+    suspend fun renameEpisode(dramaId: String, episodeId: String, newTitle: String): Boolean {
+        val db = firestore ?: return false
+        return try {
+            val docRef = db.collection("dramas").document(dramaId)
+            val snapshot = docRef.get().await()
+            val dto = snapshot.toObject(DramaFirestoreDto::class.java) ?: return false
+            val updatedEpisodes = dto.episodes.map { ep ->
+                if (ep.id == episodeId) ep.copy(title = newTitle) else ep
+            }
+            docRef.update("episodes", updatedEpisodes).await()
+            true
+        } catch (e: Exception) {
+            Log.e("FirestoreDramaDataSource", "Error renaming episode $episodeId", e)
+            false
+        }
+    }
+
+    /**
+     * Rename a drama title.
+     */
+    suspend fun renameDrama(dramaId: String, newTitle: String): Boolean {
+        val db = firestore ?: return false
+        return try {
+            db.collection("dramas").document(dramaId).update("title", newTitle).await()
+            true
+        } catch (e: Exception) {
+            Log.e("FirestoreDramaDataSource", "Error renaming drama $dramaId", e)
+            false
         }
     }
 

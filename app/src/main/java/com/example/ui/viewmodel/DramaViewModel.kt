@@ -3,10 +3,13 @@ package com.example.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.auth.AuthManager
+import com.example.data.auth.UserProfile
 import com.example.data.local.FavoriteEntity
 import com.example.data.local.WatchHistoryEntity
 import com.example.data.model.Drama
 import com.example.data.model.DramaCategory
+import com.example.data.model.Episode
 import com.example.data.model.PlaybackEpisodeItem
 import com.example.data.remote.DramaRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +23,18 @@ import kotlinx.coroutines.launch
 class DramaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = DramaRepository(application)
+    private val authManager = AuthManager(application)
+
+    // Auth Flows
+    val currentUser: StateFlow<UserProfile?> = authManager.currentUser
+    val isAuthenticating: StateFlow<Boolean> = authManager.isAuthenticating
+    val authError: StateFlow<String?> = authManager.authError
+
+    private val _isPublishing = MutableStateFlow(false)
+    val isPublishing: StateFlow<Boolean> = _isPublishing.asStateFlow()
+
+    private val _publishMessage = MutableStateFlow<String?>(null)
+    val publishMessage: StateFlow<String?> = _publishMessage.asStateFlow()
 
     private val _allDramas = MutableStateFlow<List<Drama>>(emptyList())
     val allDramas: StateFlow<List<Drama>> = _allDramas.asStateFlow()
@@ -217,5 +232,225 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleMute() {
         _isMuted.value = !_isMuted.value
+    }
+
+    // --- Authentication & Account Management ---
+
+    fun signInWithGoogle(serverClientId: String = "") {
+        viewModelScope.launch {
+            authManager.signInWithGoogle(serverClientId)
+        }
+    }
+
+    fun signInWithCustomProfile(name: String, email: String, avatarUrl: String) {
+        authManager.signInWithCustomProfile(name, email, avatarUrl)
+    }
+
+    fun signOut() {
+        viewModelScope.launch {
+            authManager.signOut()
+        }
+    }
+
+    fun switchAccount(serverClientId: String = "") {
+        viewModelScope.launch {
+            authManager.signOut()
+            authManager.signInWithGoogle(serverClientId)
+        }
+    }
+
+    // --- Publishing, Uploading & Video Management ---
+
+    /**
+     * Publishes a new drama or adds an episode with real-time online syncing.
+     */
+    fun publishNewDrama(
+        title: String,
+        originalTitle: String = "",
+        synopsis: String,
+        category: DramaCategory,
+        posterUrl: String,
+        bannerUrl: String,
+        episodeTitle: String,
+        videoUrl: String,
+        durationSeconds: Int = 120,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isPublishing.value = true
+            val user = currentUser.value
+            val authorId = user?.uid ?: "creator_guest_${System.currentTimeMillis()}"
+            val authorName = user?.displayName ?: "Criador Mine Drama"
+            val authorPhoto = user?.photoUrl ?: ""
+
+            val dramaId = "drama_user_${System.currentTimeMillis()}"
+            val ep1 = Episode(
+                id = "${dramaId}_ep_1",
+                dramaId = dramaId,
+                episodeNumber = 1,
+                title = episodeTitle.ifBlank { "Episódio 1 - $title" },
+                durationSeconds = durationSeconds,
+                videoUrl = videoUrl,
+                thumbnailUrl = posterUrl,
+                synopsis = synopsis,
+                isFree = true,
+                likesCount = 0L,
+                uploadedAt = System.currentTimeMillis()
+            )
+
+            val newDrama = Drama(
+                id = dramaId,
+                title = title,
+                originalTitle = originalTitle.ifBlank { title },
+                synopsis = synopsis,
+                category = category,
+                posterUrl = posterUrl,
+                bannerUrl = bannerUrl.ifBlank { posterUrl },
+                rating = 5.0,
+                views = 1L,
+                likes = 0L,
+                releaseYear = 2024,
+                director = authorName,
+                cast = listOf(authorName),
+                totalEpisodes = 1,
+                isTrending = true,
+                isTop10 = false,
+                topRank = null,
+                tags = listOf(category.displayName, "Novo Upload", "Comunidade"),
+                episodes = listOf(ep1),
+                authorId = authorId,
+                authorName = authorName,
+                authorPhotoUrl = authorPhoto
+            )
+
+            val success = repository.publishOrUpdateDrama(newDrama)
+            _isPublishing.value = false
+            if (success) {
+                _publishMessage.value = "Vídeo e drama publicados com sucesso para todos os usuários online!"
+                // Refresh local catalog immediately
+                loadCatalog(forceRefresh = true)
+                onSuccess()
+            } else {
+                onError("Não foi possível publicar online. Verifique sua conexão e tente novamente.")
+            }
+        }
+    }
+
+    /**
+     * Rename a video/episode title in an existing drama online.
+     */
+    fun renameEpisode(
+        dramaId: String,
+        episodeId: String,
+        newTitle: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val success = repository.renameEpisode(dramaId, episodeId, newTitle)
+            if (success) {
+                // Update currently open detail or feed if applicable
+                _selectedDramaForDetail.value?.let { current ->
+                    if (current.id == dramaId) {
+                        _selectedDramaForDetail.value = current.copy(
+                            episodes = current.episodes.map { if (it.id == episodeId) it.copy(title = newTitle) else it }
+                        )
+                    }
+                }
+                loadCatalog(forceRefresh = true)
+                onSuccess()
+            } else {
+                onError("Falha ao renomear o episódio online.")
+            }
+        }
+    }
+
+    /**
+     * Rename drama title online.
+     */
+    fun renameDrama(
+        dramaId: String,
+        newTitle: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val success = repository.renameDrama(dramaId, newTitle)
+            if (success) {
+                _selectedDramaForDetail.value?.let { current ->
+                    if (current.id == dramaId) {
+                        _selectedDramaForDetail.value = current.copy(title = newTitle)
+                    }
+                }
+                loadCatalog(forceRefresh = true)
+                onSuccess()
+            } else {
+                onError("Falha ao renomear o drama.")
+            }
+        }
+    }
+
+    /**
+     * Delete drama online.
+     */
+    fun deleteDrama(dramaId: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            val success = repository.deleteDrama(dramaId)
+            if (success) {
+                if (_selectedDramaForDetail.value?.id == dramaId) {
+                    _selectedDramaForDetail.value = null
+                }
+                loadCatalog(forceRefresh = true)
+                onSuccess()
+            } else {
+                onError("Falha ao excluir o drama.")
+            }
+        }
+    }
+
+    /**
+     * Add new episode to existing drama online.
+     */
+    fun addEpisodeToDrama(
+        dramaId: String,
+        episodeTitle: String,
+        videoUrl: String,
+        durationSeconds: Int = 120,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isPublishing.value = true
+            val drama = repository.getDramaById(dramaId)
+            if (drama == null) {
+                _isPublishing.value = false
+                onError("Drama não encontrado.")
+                return@launch
+            }
+            val nextEpNumber = drama.episodes.size + 1
+            val newEpisode = Episode(
+                id = "${dramaId}_ep_$nextEpNumber",
+                dramaId = dramaId,
+                episodeNumber = nextEpNumber,
+                title = episodeTitle.ifBlank { "Episódio $nextEpNumber" },
+                durationSeconds = durationSeconds,
+                videoUrl = videoUrl,
+                thumbnailUrl = drama.posterUrl,
+                synopsis = "Novo episódio de ${drama.title}",
+                isFree = true,
+                likesCount = 0L,
+                uploadedAt = System.currentTimeMillis()
+            )
+
+            val success = repository.addEpisodeToDrama(dramaId, newEpisode)
+            _isPublishing.value = false
+            if (success) {
+                loadCatalog(forceRefresh = true)
+                onSuccess()
+            } else {
+                onError("Falha ao adicionar novo episódio online.")
+            }
+        }
     }
 }

@@ -42,6 +42,20 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.viewmodel.DramaViewModel
 
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.PlayCircleFilled
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Tv
+
 enum class MainTab(
     val title: String,
     val selectedIcon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -49,8 +63,9 @@ enum class MainTab(
 ) {
     PARA_VOCE("Para Você", Icons.Filled.PlayCircleFilled, Icons.Outlined.Movie),
     NOVELAS("Novelas", Icons.Filled.Tv, Icons.Outlined.Tv),
+    PUBLICAR("Publicar", Icons.Filled.CloudUpload, Icons.Outlined.CloudUpload),
     EXPLORAR("Explorar", Icons.Filled.Search, Icons.Outlined.Search),
-    MINHA_LISTA("Minha Lista", Icons.Filled.Bookmark, Icons.Outlined.BookmarkBorder)
+    PERFIL("Perfil", Icons.Filled.AccountCircle, Icons.Outlined.AccountCircle)
 }
 
 @Composable
@@ -153,7 +168,7 @@ fun MainScreen(
                                 onProgressUpdate = { drama, epNum, pos, dur ->
                                     viewModel.saveWatchProgress(drama, epNum, pos, dur)
                                 },
-                                onSearchClick = { selectedTab = 2 },
+                                onSearchClick = { selectedTab = 3 },
                                 onDramaDetailsClick = { drama -> viewModel.openDramaDetails(drama) }
                             )
                         }
@@ -169,11 +184,17 @@ fun MainScreen(
                                         selectedTab = 0
                                     }
                                 },
-                                onSearchClick = { selectedTab = 2 },
+                                onSearchClick = { selectedTab = 3 },
                                 onRefreshCatalog = { viewModel.loadCatalog(forceRefresh = true) }
                             )
                         }
                         2 -> {
+                            PublishDramaScreen(
+                                viewModel = viewModel,
+                                onNavigateToFeed = { selectedTab = 0 }
+                            )
+                        }
+                        3 -> {
                             ExploreSearchScreen(
                                 searchQuery = searchQuery,
                                 searchResults = searchResults,
@@ -182,20 +203,17 @@ fun MainScreen(
                                 onDramaClick = { drama -> viewModel.openDramaDetails(drama) }
                             )
                         }
-                        3 -> {
+                        4 -> {
                             MyListScreen(
-                                watchHistory = watchHistory,
-                                favorites = favorites,
-                                likedKeys = likedKeys,
-                                allDramas = allDramas,
+                                viewModel = viewModel,
                                 onPlayEpisode = { dramaId, epNum ->
                                     viewModel.playDramaEpisode(dramaId, epNum) {
                                         selectedTab = 0
                                     }
                                 },
                                 onDramaClick = { drama -> viewModel.openDramaDetails(drama) },
-                                onClearHistory = { viewModel.clearWatchHistory() },
-                                onExploreClick = { selectedTab = 1 }
+                                onExploreClick = { selectedTab = 1 },
+                                onNavigateToUpload = { selectedTab = 2 }
                             )
                         }
                     }

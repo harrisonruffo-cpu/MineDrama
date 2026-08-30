@@ -23,7 +23,10 @@ data class Drama(
     val isTop10: Boolean = false,
     val topRank: Int? = null,
     val tags: List<String> = emptyList(),
-    val episodes: List<Episode> = emptyList()
+    val episodes: List<Episode> = emptyList(),
+    val authorId: String = "",
+    val authorName: String = "",
+    val authorPhotoUrl: String = ""
 )
 
 @JsonClass(generateAdapter = true)
@@ -37,7 +40,8 @@ data class Episode(
     val thumbnailUrl: String,
     val synopsis: String = "",
     val isFree: Boolean = true,
-    val likesCount: Long = 0
+    val likesCount: Long = 0,
+    val uploadedAt: Long = System.currentTimeMillis()
 )
 
 enum class DramaCategory(val displayName: String, val iconEmoji: String) {
