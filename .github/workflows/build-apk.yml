@@ -78,31 +78,32 @@ jobs:
       - name: Organizar e Renomear APK de Saída
         run: |
           mkdir -p release-apk
-          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apk/LitoralNovelas-v1.0.3.apk \;
+          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apk/LitoralNovelas-v1.0.4.apk \;
           echo "APK gerado com sucesso:"
           ls -lh release-apk/
 
       - name: Salvar APK nos Artifacts do GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: LitoralNovelas-v1.0.3-APK
-          path: release-apk/LitoralNovelas-v1.0.3.apk
+          name: LitoralNovelas-v1.0.4-APK
+          path: release-apk/LitoralNovelas-v1.0.4.apk
           retention-days: 30
 
       - name: Criar GitHub Release Oficial
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.create_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          files: release-apk/LitoralNovelas-v1.0.3.apk
-          name: Litoral Novelas ${{ github.ref_name || 'v1.0.3' }}
+          files: release-apk/LitoralNovelas-v1.0.4.apk
+          name: Litoral Novelas ${{ github.ref_name || 'v1.0.4' }}
           body: |
-            ## 🌊 Litoral Novelas v1.0.3 - APK Oficial para Instalação
+            ## 🌊 Litoral Novelas v1.0.4 - APK Oficial para Instalação
 
-            - **Download do APK**: Baixe o arquivo `LitoralNovelas-v1.0.3.apk` abaixo e instale diretamente no seu aparelho Android.
-            - **Novidades da Versão 1.0.3**:
-              - ☁️ **Armazenamento em Nuvem Persistente**: Inicialização nativa do Firestore com persistência em disco offline e sincronização em nuvem completa de preferências, perfil, curtidas, histórico e favoritos.
-              - 🎬 **Uploads & Vídeos com Links Camuflados**: Upload direto para Firebase Cloud Storage ou inclusão por links diretos de streaming.
-              - 🚀 **Performance & Estabilidade**: Otimização de caching de vídeo e streaming vertical fluido.
+            - **Download do APK**: Baixe o arquivo `LitoralNovelas-v1.0.4.apk` abaixo e instale diretamente no seu aparelho Android.
+            - **Novidades da Versão 1.0.4**:
+              - 🔗 **Resolução Automática de Links de Streaming**: Suporte aprimorado para links do Google Drive, Dropbox, OneDrive, Pixeldrain, HLS (.m3u8) e MP4.
+              - 🛠️ **Correção no Player de Vídeo**: Prevenção contra erros de codec ao abrir URLs de compartilhamento na nuvem camufladas no botão do episódio.
+              - ☁️ **Persistência Total na Nuvem**: Armazenamento com Firestore offline cache e Cloud Storage.
+              - 🔄 **Recuperação e Alternativas de Streaming**: Botão de recarga e fluxo de fallback imediato.
           draft: false
           prerelease: false
         env:

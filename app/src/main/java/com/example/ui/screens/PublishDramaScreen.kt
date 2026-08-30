@@ -88,6 +88,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.model.Drama
 import com.example.data.model.DramaCategory
+import com.example.data.util.VideoUrlResolver
 import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceElevated
@@ -754,11 +755,11 @@ fun PublishDramaScreen(
                                             onValueChange = {
                                                 directLinkInput = it
                                                 if (it.isNotBlank()) {
-                                                    videoUrl = it.trim()
+                                                    videoUrl = VideoUrlResolver.resolveDirectVideoUrl(it.trim())
                                                 }
                                             },
-                                            label = { Text("Link URL do Vídeo (MP4 / HLS / Web)") },
-                                            placeholder = { Text("https://exemplo.com/meu-video.mp4") },
+                                            label = { Text("Link URL do Vídeo (Google Drive, Dropbox, MP4, HLS)") },
+                                            placeholder = { Text("https://drive.google.com/file/d/... ou https://exemplo.com/video.mp4") },
                                             singleLine = true,
                                             leadingIcon = {
                                                 Icon(Icons.Filled.Link, contentDescription = null, tint = DramaGold)
@@ -774,11 +775,39 @@ fun PublishDramaScreen(
                                             )
                                         )
                                         Spacer(modifier = Modifier.height(6.dp))
-                                        Text(
-                                            text = "💡 O link fica 100% camuflado no botão do episódio. Quando o usuário clica no botão (ex: 'Episódio 1'), o vídeo do link é reproduzido instantaneamente em tela cheia.",
-                                            color = DramaGold.copy(alpha = 0.9f),
-                                            fontSize = 11.sp
-                                        )
+                                        
+                                        val isGoogleDrive = directLinkInput.contains("drive.google.com") || directLinkInput.contains("docs.google.com")
+                                        val isDropbox = directLinkInput.contains("dropbox.com")
+                                        val isHls = directLinkInput.contains(".m3u8")
+
+                                        if (isGoogleDrive) {
+                                            Text(
+                                                text = "✓ Google Drive detectado: link convertido automaticamente para streaming direto no app!",
+                                                color = Color(0xFF4CAF50),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        } else if (isDropbox) {
+                                            Text(
+                                                text = "✓ Dropbox detectado: link convertido para download/streaming direto!",
+                                                color = Color(0xFF4CAF50),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        } else if (isHls) {
+                                            Text(
+                                                text = "✓ Streaming HLS (.m3u8) detectado: suporte nativo ativado!",
+                                                color = Color(0xFF4CAF50),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "💡 O link fica 100% camuflado no botão do episódio. Quando o usuário clica no botão (ex: 'Episódio 1'), o vídeo do link é reproduzido instantaneamente em tela cheia.",
+                                                color = DramaGold.copy(alpha = 0.9f),
+                                                fontSize = 11.sp
+                                            )
+                                        }
                                     }
                                     1 -> {
                                         // Galeria local

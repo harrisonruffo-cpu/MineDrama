@@ -47,8 +47,10 @@ import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.SlowMotionVideo
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -58,6 +60,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import com.example.data.util.VideoUrlResolver
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -368,13 +371,13 @@ fun SingleEpisodePlayerView(
         "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
     )
 
-    // Robust ExoPlayer creation with mobile UserAgent & headers to prevent HTTP 403
+    // Robust ExoPlayer creation with mobile UserAgent, timeout configurations & URL resolution
     val exoPlayer = remember(item.episode.id, retryCount) {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Linux; Android 14; Mobile; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
             .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(15000)
-            .setReadTimeoutMs(20000)
+            .setConnectTimeoutMs(20000)
+            .setReadTimeoutMs(30000)
             .setDefaultRequestProperties(
                 mapOf(
                     "Accept" to "*/*",
@@ -390,19 +393,9 @@ fun SingleEpisodePlayerView(
             .build()
 
         val rawUrl = item.episode.videoUrl
-        val normalizedUrl = if (rawUrl.contains("commondatastorage.googleapis.com")) {
-            rawUrl.replace("commondatastorage.googleapis.com", "storage.googleapis.com")
-        } else {
-            rawUrl
-        }
+        val resolvedUrl = VideoUrlResolver.resolveDirectVideoUrl(rawUrl)
+        val mediaItem = VideoUrlResolver.buildMediaItem(resolvedUrl)
 
-        val videoUri = if (normalizedUrl.startsWith("/")) {
-            Uri.fromFile(java.io.File(normalizedUrl))
-        } else {
-            Uri.parse(normalizedUrl)
-        }
-
-        val mediaItem = MediaItem.fromUri(videoUri)
         player.setMediaItem(mediaItem)
         player.repeatMode = Player.REPEAT_MODE_OFF
         player.prepare()
@@ -442,8 +435,9 @@ fun SingleEpisodePlayerView(
                 android.util.Log.e("VerticalEpisodePlayer", "Playback error on episode ${item.episode.episodeNumber}: ${error.message}", error)
                 if (!hasAttemptedFallback) {
                     hasAttemptedFallback = true
-                    val fallback = fallbackUrls[item.episode.episodeNumber % fallbackUrls.size]
-                    exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(fallback)))
+                    val fallback = VideoUrlResolver.getFallbackUrl(item.episode.episodeNumber)
+                    val fallbackItem = VideoUrlResolver.buildMediaItem(fallback)
+                    exoPlayer.setMediaItem(fallbackItem)
                     exoPlayer.prepare()
                     exoPlayer.play()
                 } else {
@@ -550,13 +544,13 @@ fun SingleEpisodePlayerView(
             }
         }
 
-        // Playback Error Overlay with Retry
+        // Playback Error Overlay with Retry & Backup Stream Options
         if (hasPlaybackError) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.8f))
-                    .padding(32.dp),
+                    .background(Color.Black.copy(alpha = 0.82f))
+                    .padding(28.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -571,32 +565,54 @@ fun SingleEpisodePlayerView(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Não foi possível carregar este vídeo.",
+                        text = "Não foi possível carregar este link.",
                         color = Color.White,
-                        fontSize = 15.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Tentando restabelecer o link de streaming...",
+                        text = "O servidor do link pode estar temporariamente indisponível ou exigir autorização pública.",
                         color = TextSecondary,
                         fontSize = 12.sp,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = {
-                            hasPlaybackError = false
-                            hasAttemptedFallback = false
-                            retryCount++
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson),
-                        shape = RoundedCornerShape(20.dp)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Tentar Novamente", fontWeight = FontWeight.Bold)
+                        Button(
+                            onClick = {
+                                hasPlaybackError = false
+                                hasAttemptedFallback = false
+                                retryCount++
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson),
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Tentar Novamente", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                hasPlaybackError = false
+                                val fallback = VideoUrlResolver.getFallbackUrl(item.episode.episodeNumber)
+                                val fallbackItem = VideoUrlResolver.buildMediaItem(fallback)
+                                exoPlayer.setMediaItem(fallbackItem)
+                                exoPlayer.prepare()
+                                exoPlayer.play()
+                            },
+                            shape = RoundedCornerShape(20.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = DramaGold)
+                        ) {
+                            Icon(Icons.Filled.SlowMotionVideo, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Vídeo Alternativo", fontSize = 13.sp)
+                        }
                     }
                 }
             }

@@ -13,6 +13,7 @@ import com.example.data.model.DramaCategory
 import com.example.data.model.Episode
 import com.example.data.model.PlaybackEpisodeItem
 import com.example.data.remote.DramaRepository
+import com.example.data.util.VideoUrlResolver
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -468,7 +469,7 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
                  episodeNumber = 1,
                  title = episodeTitle.ifBlank { "Episódio 1 - $title" },
                  durationSeconds = durationSeconds,
-                 videoUrl = finalVideoUrl,
+                 videoUrl = VideoUrlResolver.resolveDirectVideoUrl(finalVideoUrl),
                  thumbnailUrl = finalPosterUrl,
                  synopsis = synopsis,
                  isFree = true,
