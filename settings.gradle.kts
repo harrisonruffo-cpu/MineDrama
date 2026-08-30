@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Mine Drama"
+rootProject.name = "Litoral Novelas"
 
 include(":app")

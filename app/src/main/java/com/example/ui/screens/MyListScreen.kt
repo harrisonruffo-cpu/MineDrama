@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExitToApp
@@ -75,6 +76,7 @@ import com.example.data.auth.UserProfile
 import com.example.data.local.FavoriteEntity
 import com.example.data.local.WatchHistoryEntity
 import com.example.data.model.Drama
+import com.example.ui.components.AuthDialog
 import com.example.ui.components.DramaCard
 import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.DarkSurface
@@ -83,6 +85,9 @@ import com.example.ui.theme.DarkSurfaceHighlight
 import com.example.ui.theme.DramaCrimson
 import com.example.ui.theme.DramaCrimsonBright
 import com.example.ui.theme.DramaGold
+import com.example.ui.theme.LitoralCyanBright
+import com.example.ui.theme.LitoralGold
+import com.example.ui.theme.LitoralWaveBlue
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.TextTertiary
@@ -109,240 +114,12 @@ fun MyListScreen(
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var showClearDialog by remember { mutableStateOf(false) }
-    var showGoogleAccountSelector by remember { mutableStateOf(false) }
-    var showAddNewAccountDialog by remember { mutableStateOf(false) }
+    var showAuthDialog by remember { mutableStateOf(false) }
 
-    var newAccountName by remember { mutableStateOf("") }
-    var newAccountEmail by remember { mutableStateOf("") }
-
-    // Google Account Chooser Dialog
-    if (showGoogleAccountSelector) {
-        AlertDialog(
-            onDismissRequest = { showGoogleAccountSelector = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(Color.White),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "G",
-                            color = Color(0xFF4285F4),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Contas Google",
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-                }
-            },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Selecione uma conta Google para entrar ou trocar:",
-                        color = TextSecondary,
-                        fontSize = 13.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    savedAccounts.forEach { account ->
-                        val isSelected = currentUser?.email.equals(account.email, ignoreCase = true)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (isSelected) DarkSurfaceHighlight else DarkSurface)
-                                .clickable {
-                                    viewModel.selectAccount(account)
-                                    showGoogleAccountSelector = false
-                                }
-                                .padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (account.photoUrl.isNotBlank()) {
-                                AsyncImage(
-                                    model = account.photoUrl,
-                                    contentDescription = account.displayName,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .border(if (isSelected) 2.dp else 1.dp, if (isSelected) DramaGold else Color.Transparent, CircleShape)
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(DramaCrimson),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = account.displayName.take(1).uppercase(),
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = account.displayName,
-                                    color = TextPrimary,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    text = account.email,
-                                    color = TextSecondary,
-                                    fontSize = 12.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-
-                            if (isSelected) {
-                                Icon(
-                                    imageVector = Icons.Filled.Check,
-                                    contentDescription = "Conta ativa",
-                                    tint = DramaGold,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            } else {
-                                IconButton(
-                                    onClick = { viewModel.removeSavedAccount(account.email) },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Close,
-                                        contentDescription = "Remover",
-                                        tint = TextTertiary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    HorizontalDivider(color = DarkSurfaceHighlight)
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable {
-                                showGoogleAccountSelector = false
-                                showAddNewAccountDialog = true
-                            }
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(DarkSurfaceHighlight),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Filled.Add, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(20.dp))
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "Adicionar outra conta Google",
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showGoogleAccountSelector = false }) {
-                    Text("Fechar", color = DramaCrimsonBright)
-                }
-            },
-            containerColor = DarkSurfaceElevated
-        )
-    }
-
-    // Add New Google Account Dialog
-    if (showAddNewAccountDialog) {
-        AlertDialog(
-            onDismissRequest = { showAddNewAccountDialog = false },
-            title = { Text("Adicionar Conta Google", color = TextPrimary, fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    Text("Digite o nome e email da sua conta Google:", color = TextSecondary, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = newAccountName,
-                        onValueChange = { newAccountName = it },
-                        label = { Text("Nome da Conta") },
-                        placeholder = { Text("Ex: Ruffo DJ") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().testTag("input_new_account_name"),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = DramaCrimsonBright,
-                            unfocusedBorderColor = DarkSurfaceHighlight,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = newAccountEmail,
-                        onValueChange = { newAccountEmail = it },
-                        label = { Text("Email Google (@gmail.com)") },
-                        placeholder = { Text("Ex: ruffodj01@gmail.com") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().testTag("input_new_account_email"),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = DramaCrimsonBright,
-                            unfocusedBorderColor = DarkSurfaceHighlight,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (newAccountEmail.isNotBlank()) {
-                            viewModel.addAndSignInGoogleAccount(
-                                name = newAccountName.ifBlank { newAccountEmail.substringBefore("@") },
-                                email = newAccountEmail.trim(),
-                                avatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80"
-                            )
-                            newAccountName = ""
-                            newAccountEmail = ""
-                            showAddNewAccountDialog = false
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson)
-                ) {
-                    Text("Conectar Conta")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddNewAccountDialog = false }) {
-                    Text("Cancelar", color = TextSecondary)
-                }
-            },
-            containerColor = DarkSurfaceElevated
+    if (showAuthDialog) {
+        AuthDialog(
+            viewModel = viewModel,
+            onDismiss = { showAuthDialog = false }
         )
     }
 
@@ -417,14 +194,14 @@ fun MyListScreen(
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Faça Login com sua Conta Google",
+                                text = "Conecte sua Conta no Litoral Novelas",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = TextPrimary
                                 )
                             )
                             Text(
-                                text = "Publique novelas, sincronize seus favoritos e troque de perfil",
+                                text = "Acesse com Google ou E-mail para sincronizar seu histórico e novelas na nuvem",
                                 style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                             )
                         }
@@ -437,29 +214,34 @@ fun MyListScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
-                            onClick = { showGoogleAccountSelector = true },
+                            onClick = { showAuthDialog = true },
                             enabled = !isAuthenticating,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4285F4)),
-                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = LitoralCyanBright,
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f).testTag("google_signin_button")
                         ) {
                             if (isAuthenticating) {
-                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Conectando...", fontSize = 12.sp, color = Color.White)
+                                Text("Conectando...", fontSize = 12.sp, color = Color.Black)
                             } else {
-                                Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Entrar com Google", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text("Entrar / Login", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                             }
                         }
 
                         OutlinedButton(
-                            onClick = { showGoogleAccountSelector = true },
-                            shape = RoundedCornerShape(8.dp),
+                            onClick = { showAuthDialog = true },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = LitoralCyanBright),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, LitoralCyanBright.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.testTag("custom_profile_button")
                         ) {
-                            Text("Trocar Conta", fontSize = 12.sp, color = TextPrimary)
+                            Text("Trocar Conta", fontSize = 12.sp)
                         }
                     }
 
@@ -485,14 +267,14 @@ fun MyListScreen(
                                 modifier = Modifier
                                     .size(52.dp)
                                     .clip(CircleShape)
-                                    .border(2.dp, DramaGold, CircleShape)
+                                    .border(2.dp, LitoralCyanBright, CircleShape)
                             )
                         } else {
                             Box(
                                 modifier = Modifier
                                     .size(52.dp)
                                     .clip(CircleShape)
-                                    .background(DramaCrimson),
+                                    .background(LitoralWaveBlue),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -519,10 +301,10 @@ fun MyListScreen(
                                 Box(
                                     modifier = Modifier
                                         .clip(CircleShape)
-                                        .background(DramaGold.copy(alpha = 0.2f))
+                                        .background(LitoralGold.copy(alpha = 0.2f))
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
-                                    Text("CRIADOR", color = DramaGold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    Text("CRIADOR", color = LitoralGold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
 
@@ -543,20 +325,20 @@ fun MyListScreen(
                     ) {
                         // Switch account button
                         Button(
-                            onClick = { showGoogleAccountSelector = true },
+                            onClick = { showAuthDialog = true },
                             colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceHighlight),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f).testTag("switch_account_button")
                         ) {
-                            Icon(Icons.Filled.SwapHoriz, contentDescription = null, tint = DramaGold, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Filled.SwapHoriz, contentDescription = null, tint = LitoralCyanBright, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Trocar Conta Google", fontSize = 12.sp, color = TextPrimary, fontWeight = FontWeight.Bold)
+                            Text("Trocar Conta / Login", fontSize = 12.sp, color = TextPrimary, fontWeight = FontWeight.Bold)
                         }
 
                         // Logout button
                         OutlinedButton(
                             onClick = { viewModel.signOut() },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.testTag("signout_button")
                         ) {
                             Icon(Icons.Filled.ExitToApp, contentDescription = null, tint = DramaCrimsonBright, modifier = Modifier.size(16.dp))

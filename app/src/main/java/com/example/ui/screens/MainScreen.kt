@@ -1,50 +1,27 @@
 package com.example.ui.screens
 
+import android.app.Activity
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.PlayCircleFilled
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Tv
-import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.outlined.Movie
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Tv
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.data.model.Drama
-import com.example.ui.components.VerticalEpisodePlayer
-import com.example.ui.theme.DarkBackground
-import com.example.ui.theme.DarkSurface
-import com.example.ui.theme.DramaCrimsonBright
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
-import com.example.ui.viewmodel.DramaViewModel
-
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayCircleFilled
 import androidx.compose.material.icons.filled.Search
@@ -55,6 +32,48 @@ import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tv
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.R
+import com.example.data.model.Drama
+import com.example.ui.components.AuthDialog
+import com.example.ui.components.VerticalEpisodePlayer
+import com.example.ui.theme.DarkBackground
+import com.example.ui.theme.DarkSurface
+import com.example.ui.theme.DarkSurfaceElevated
+import com.example.ui.theme.DramaCrimsonBright
+import com.example.ui.theme.LitoralCyanBright
+import com.example.ui.theme.LitoralGold
+import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
+import com.example.ui.viewmodel.DramaViewModel
 
 enum class MainTab(
     val title: String,
@@ -73,7 +92,10 @@ fun MainScreen(
     viewModel: DramaViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var showExitDialog by remember { mutableStateOf(false) }
+    var showAuthDialog by remember { mutableStateOf(false) }
 
     val allDramas by viewModel.allDramas.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -83,6 +105,7 @@ fun MainScreen(
     val playbackFeed by viewModel.playbackFeed.collectAsState()
     val currentFeedIndex by viewModel.currentFeedIndex.collectAsState()
     val selectedDramaForDetail by viewModel.selectedDramaForDetail.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
 
     val favorites by viewModel.favorites.collectAsState()
     val watchHistory by viewModel.watchHistory.collectAsState()
@@ -90,10 +113,107 @@ fun MainScreen(
 
     val currentDetailDrama = selectedDramaForDetail
 
+    // Android Back Button Handler
+    BackHandler(enabled = true) {
+        if (showAuthDialog) {
+            showAuthDialog = false
+        } else if (currentDetailDrama != null) {
+            viewModel.closeDramaDetails()
+        } else if (selectedTab != 0) {
+            selectedTab = 0
+        } else {
+            // We are on the root home screen -> ask confirmation before exiting
+            showExitDialog = true
+        }
+    }
+
+    // Exit Confirmation Dialog
+    if (showExitDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitDialog = false },
+            containerColor = DarkSurfaceElevated,
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.litoral_novelas_logo_1788090147754),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .border(1.dp, LitoralCyanBright.copy(alpha = 0.6f), RoundedCornerShape(6.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    Text(
+                        text = "Sair do Litoral Novelas?",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Tem certeza de que deseja sair do aplicativo agora?",
+                        color = TextPrimary,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "Seu histórico, curtidas e episódios assistidos continuam salvos na nuvem.",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showExitDialog = false
+                        (context as? Activity)?.finish()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DramaCrimsonBright,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ExitToApp,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Sair do App", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showExitDialog = false },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = LitoralCyanBright),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, LitoralCyanBright.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Continuar Assistindo")
+                }
+            }
+        )
+    }
+
+    // Authentication Dialog (Google, Email, Register, Forgot Password)
+    if (showAuthDialog) {
+        AuthDialog(
+            viewModel = viewModel,
+            onDismiss = { showAuthDialog = false }
+        )
+    }
+
     Box(modifier = modifier.fillMaxSize().background(DarkBackground)) {
         Scaffold(
             bottomBar = {
-                // If viewing drama detail screen, we can keep or hide bottom bar; keeping it provides quick navigation
                 NavigationBar(
                     containerColor = DarkSurface,
                     contentColor = TextPrimary,
@@ -122,8 +242,8 @@ fun MainScreen(
                                 )
                             },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = DramaCrimsonBright,
-                                selectedTextColor = DramaCrimsonBright,
+                                selectedIconColor = LitoralCyanBright,
+                                selectedTextColor = LitoralCyanBright,
                                 unselectedIconColor = TextSecondary,
                                 unselectedTextColor = TextSecondary,
                                 indicatorColor = Color.Transparent
@@ -169,7 +289,9 @@ fun MainScreen(
                                     viewModel.saveWatchProgress(drama, epNum, pos, dur)
                                 },
                                 onSearchClick = { selectedTab = 3 },
-                                onDramaDetailsClick = { drama -> viewModel.openDramaDetails(drama) }
+                                onDramaDetailsClick = { drama -> viewModel.openDramaDetails(drama) },
+                                currentUser = currentUser,
+                                onLoginClick = { showAuthDialog = true }
                             )
                         }
                         1 -> {
@@ -185,7 +307,9 @@ fun MainScreen(
                                     }
                                 },
                                 onSearchClick = { selectedTab = 3 },
-                                onRefreshCatalog = { viewModel.loadCatalog(forceRefresh = true) }
+                                onRefreshCatalog = { viewModel.loadCatalog(forceRefresh = true) },
+                                currentUser = currentUser,
+                                onLoginClick = { showAuthDialog = true }
                             )
                         }
                         2 -> {
@@ -222,3 +346,4 @@ fun MainScreen(
         }
     }
 }
+

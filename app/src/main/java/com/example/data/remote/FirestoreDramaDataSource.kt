@@ -329,4 +329,51 @@ class FirestoreDramaDataSource {
             Log.w("FirestoreDramaDataSource", "Failed to update likes for $dramaId", e)
         }
     }
+
+    /**
+     * Save user profile to Firestore cloud.
+     */
+    suspend fun saveUserProfile(user: com.example.data.auth.UserProfile): Boolean {
+        val db = firestore ?: return false
+        return try {
+            val data = mapOf(
+                "uid" to user.uid,
+                "displayName" to user.displayName,
+                "email" to user.email,
+                "photoUrl" to user.photoUrl,
+                "isCreator" to user.isCreator,
+                "lastActive" to System.currentTimeMillis()
+            )
+            db.collection("users").document(user.uid)
+                .set(data, SetOptions.merge())
+                .await()
+            true
+        } catch (e: Exception) {
+            Log.w("FirestoreDramaDataSource", "Failed to save user profile to cloud: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Fetch user profile from Firestore cloud.
+     */
+    suspend fun getUserProfile(uid: String): com.example.data.auth.UserProfile? {
+        val db = firestore ?: return null
+        return try {
+            val doc = db.collection("users").document(uid).get().await()
+            if (doc.exists()) {
+                com.example.data.auth.UserProfile(
+                    uid = doc.getString("uid") ?: uid,
+                    displayName = doc.getString("displayName") ?: "",
+                    email = doc.getString("email") ?: "",
+                    photoUrl = doc.getString("photoUrl") ?: "",
+                    isAnonymous = false,
+                    isCreator = doc.getBoolean("isCreator") ?: true
+                )
+            } else null
+        } catch (e: Exception) {
+            Log.w("FirestoreDramaDataSource", "Failed to get user profile from cloud: ${e.message}")
+            null
+        }
+    }
 }

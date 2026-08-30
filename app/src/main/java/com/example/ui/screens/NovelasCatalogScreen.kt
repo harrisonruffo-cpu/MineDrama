@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -38,10 +41,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.example.R
+import com.example.data.auth.UserProfile
 import com.example.data.model.Drama
 import com.example.data.model.DramaCategory
 import com.example.ui.components.DramaCard
@@ -53,6 +61,8 @@ import com.example.ui.theme.DarkSurfaceHighlight
 import com.example.ui.theme.DramaCrimson
 import com.example.ui.theme.DramaCrimsonBright
 import com.example.ui.theme.DramaGold
+import com.example.ui.theme.LitoralCyanBright
+import com.example.ui.theme.LitoralGold
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
@@ -66,6 +76,8 @@ fun NovelasCatalogScreen(
     onWatchClick: (Drama) -> Unit,
     onSearchClick: () -> Unit,
     onRefreshCatalog: () -> Unit,
+    currentUser: UserProfile? = null,
+    onLoginClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val filteredDramas = if (selectedCategory == DramaCategory.TODAS) {
@@ -94,55 +106,98 @@ fun NovelasCatalogScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
+                    Image(
+                        painter = painterResource(id = R.drawable.litoral_novelas_logo_1788090147754),
+                        contentDescription = "Litoral Novelas",
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(38.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(DramaCrimson),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Tv,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
+                            .border(1.dp, LitoralCyanBright.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "MINE DRAMA",
+                            text = "LITORAL NOVELAS",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Black,
                                 color = TextPrimary,
-                                letterSpacing = 1.sp
+                                letterSpacing = 0.8.sp
                             )
                         )
                         Text(
-                            text = "Novelas & Minisséries Online",
+                            text = "Histórias que emocionam • Online",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = DramaGold,
+                                color = LitoralGold,
                                 fontSize = 10.sp
                             )
                         )
                     }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Quick Login/Account Button
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(DarkSurfaceElevated)
+                            .border(
+                                width = 1.dp,
+                                color = if (currentUser != null) LitoralCyanBright.copy(alpha = 0.6f) else LitoralGold.copy(alpha = 0.8f),
+                                shape = RoundedCornerShape(20.dp)
+                            )
+                            .clickable { onLoginClick() }
+                            .padding(horizontal = 8.dp, vertical = 5.dp)
+                            .testTag("catalog_top_login_btn"),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (currentUser != null && currentUser.photoUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = currentUser.photoUrl,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.AccountCircle,
+                                contentDescription = "Conta",
+                                tint = if (currentUser != null) LitoralCyanBright else LitoralGold,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (currentUser != null) currentUser.displayName.take(8) else "Entrar",
+                            color = TextPrimary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
                     IconButton(
                         onClick = onRefreshCatalog,
-                        modifier = Modifier.testTag("catalog_refresh_btn")
+                        modifier = Modifier
+                            .size(34.dp)
+                            .testTag("catalog_refresh_btn")
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Refresh,
                             contentDescription = "Atualizar Catálogo",
-                            tint = TextSecondary
+                            tint = TextSecondary,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
                     IconButton(
                         onClick = onSearchClick,
                         modifier = Modifier
+                            .size(34.dp)
                             .clip(CircleShape)
                             .background(DarkSurfaceElevated)
                             .testTag("catalog_search_btn")
@@ -150,7 +205,8 @@ fun NovelasCatalogScreen(
                         Icon(
                             imageVector = Icons.Filled.Search,
                             contentDescription = "Buscar",
-                            tint = Color.White
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }

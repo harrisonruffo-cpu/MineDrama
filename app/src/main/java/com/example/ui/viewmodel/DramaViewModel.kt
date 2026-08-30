@@ -237,6 +237,54 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- Authentication & Account Management ---
 
+    fun signInWithEmail(
+        email: String,
+        pass: String,
+        onSuccess: (UserProfile) -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val result = authManager.signInWithEmailAndPassword(email, pass)
+            result.onSuccess { user ->
+                onSuccess(user)
+            }.onFailure { err ->
+                onError(err.message ?: "Erro ao entrar com e-mail.")
+            }
+        }
+    }
+
+    fun signUpWithEmail(
+        name: String,
+        email: String,
+        pass: String,
+        onSuccess: (UserProfile) -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val result = authManager.signUpWithEmailAndPassword(name, email, pass)
+            result.onSuccess { user ->
+                onSuccess(user)
+            }.onFailure { err ->
+                onError(err.message ?: "Erro ao cadastrar conta.")
+            }
+        }
+    }
+
+    fun sendPasswordReset(
+        email: String,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val result = authManager.sendPasswordResetEmail(email)
+            result.onSuccess {
+                onSuccess()
+            }.onFailure { err ->
+                onError(err.message ?: "Erro ao enviar e-mail de recuperação.")
+            }
+        }
+    }
+
     fun signInWithGoogle(serverClientId: String = "") {
         viewModelScope.launch {
             authManager.signInWithGoogle(serverClientId)

@@ -10,6 +10,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,6 +31,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
@@ -107,6 +109,8 @@ fun VerticalEpisodePlayer(
     onProgressUpdate: (Drama, Int, Long, Long) -> Unit,
     onSearchClick: () -> Unit,
     onDramaDetailsClick: (Drama) -> Unit,
+    currentUser: com.example.data.auth.UserProfile? = null,
+    onLoginClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (items.isEmpty()) {
@@ -182,48 +186,113 @@ fun VerticalEpisodePlayer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 42.dp, start = 16.dp, end = 16.dp),
+                .padding(top = 42.dp, start = 14.dp, end = 14.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { onDramaDetailsClick(items[pagerState.currentPage].drama) }
+            ) {
+                Image(
+                    painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.litoral_novelas_logo_1788090147754),
+                    contentDescription = "Litoral Novelas",
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(DramaCrimson)
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, Color(0xFF00E5FF).copy(alpha = 0.6f), RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
                     Text(
-                        text = "MINE DRAMA",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
+                        text = "LITORAL",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.Black,
                             color = Color.White,
                             letterSpacing = 1.sp
                         )
                     )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Para Você",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                    Text(
+                        text = "NOVELAS",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFFD166),
+                            fontSize = 9.sp,
+                            letterSpacing = 1.5.sp
+                        )
                     )
-                )
+                }
             }
 
-            IconButton(
-                onClick = onSearchClick,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.4f))
-                    .testTag("feed_search_button")
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Search,
-                    contentDescription = "Buscar Novelas",
-                    tint = Color.White
-                )
+                // Prominent Login Button on Home Screen
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .border(
+                            width = 1.dp,
+                            color = if (currentUser != null) Color(0xFF00E5FF).copy(alpha = 0.6f) else Color(0xFFFFD166).copy(alpha = 0.8f),
+                            shape = RoundedCornerShape(20.dp)
+                        )
+                        .clickable { onLoginClick() }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .testTag("home_top_login_button"),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (currentUser != null && currentUser.photoUrl.isNotBlank()) {
+                        AsyncImage(
+                            model = currentUser.photoUrl,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = currentUser.displayName.take(10),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Filled.AccountCircle,
+                            contentDescription = "Entrar",
+                            tint = if (currentUser != null) Color(0xFF00E5FF) else Color(0xFFFFD166),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = if (currentUser != null) "Conta" else "Entrar",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = onSearchClick,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
+                        .testTag("feed_search_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = "Buscar Novelas",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
 
