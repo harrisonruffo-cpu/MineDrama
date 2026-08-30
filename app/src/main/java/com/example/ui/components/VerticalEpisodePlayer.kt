@@ -45,6 +45,11 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -56,6 +61,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -72,15 +78,20 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
@@ -342,25 +353,63 @@ fun SingleEpisodePlayerView(
     var sliderPosition by remember { mutableFloatStateOf(0f) }
     var showPlayPauseIndicator by remember { mutableStateOf(false) }
     var isSynopsisExpanded by remember { mutableStateOf(false) }
+    var isBuffering by remember { mutableStateOf(false) }
+    var hasPlaybackError by remember { mutableStateOf(false) }
+    var hasAttemptedFallback by remember { mutableStateOf(false) }
+    var retryCount by remember { mutableIntStateOf(0) }
 
     val hearts = remember { mutableStateListOf<HeartEffect>() }
 
-    // ExoPlayer creation & lifecycle
-    val exoPlayer = remember(item.episode.id) {
-        ExoPlayer.Builder(context).build().apply {
-            val videoUri = if (item.episode.videoUrl.startsWith("/")) {
-                Uri.fromFile(java.io.File(item.episode.videoUrl))
-            } else {
-                Uri.parse(item.episode.videoUrl)
-            }
-            val mediaItem = MediaItem.fromUri(videoUri)
-            setMediaItem(mediaItem)
-            repeatMode = Player.REPEAT_MODE_OFF
-            prepare()
+    val fallbackUrls = listOf(
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
+    )
+
+    // Robust ExoPlayer creation with mobile UserAgent & headers to prevent HTTP 403
+    val exoPlayer = remember(item.episode.id, retryCount) {
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("Mozilla/5.0 (Linux; Android 14; Mobile; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(15000)
+            .setReadTimeoutMs(20000)
+            .setDefaultRequestProperties(
+                mapOf(
+                    "Accept" to "*/*",
+                    "Range" to "bytes=0-"
+                )
+            )
+
+        val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+
+        val player = ExoPlayer.Builder(context)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .build()
+
+        val rawUrl = item.episode.videoUrl
+        val normalizedUrl = if (rawUrl.contains("commondatastorage.googleapis.com")) {
+            rawUrl.replace("commondatastorage.googleapis.com", "storage.googleapis.com")
+        } else {
+            rawUrl
         }
+
+        val videoUri = if (normalizedUrl.startsWith("/")) {
+            Uri.fromFile(java.io.File(normalizedUrl))
+        } else {
+            Uri.parse(normalizedUrl)
+        }
+
+        val mediaItem = MediaItem.fromUri(videoUri)
+        player.setMediaItem(mediaItem)
+        player.repeatMode = Player.REPEAT_MODE_OFF
+        player.prepare()
+        player
     }
 
-    DisposableEffect(item.episode.id) {
+    DisposableEffect(item.episode.id, retryCount) {
         onDispose {
             exoPlayer.release()
         }
@@ -376,8 +425,8 @@ fun SingleEpisodePlayerView(
     }
 
     // Play / Pause based on page visibility
-    LaunchedEffect(isCurrentPage, isPlaying) {
-        if (isCurrentPage && isPlaying) {
+    LaunchedEffect(isCurrentPage, isPlaying, hasPlaybackError) {
+        if (isCurrentPage && isPlaying && !hasPlaybackError) {
             exoPlayer.play()
         } else {
             exoPlayer.pause()
@@ -385,11 +434,30 @@ fun SingleEpisodePlayerView(
     }
 
     // Track playback state & progress ticker
-    LaunchedEffect(isCurrentPage) {
+    LaunchedEffect(isCurrentPage, exoPlayer) {
         if (!isCurrentPage) return@LaunchedEffect
 
         val listener = object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                android.util.Log.e("VerticalEpisodePlayer", "Playback error on episode ${item.episode.episodeNumber}: ${error.message}", error)
+                if (!hasAttemptedFallback) {
+                    hasAttemptedFallback = true
+                    val fallback = fallbackUrls[item.episode.episodeNumber % fallbackUrls.size]
+                    exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(fallback)))
+                    exoPlayer.prepare()
+                    exoPlayer.play()
+                } else {
+                    hasPlaybackError = true
+                    isBuffering = false
+                }
+            }
+
             override fun onPlaybackStateChanged(playbackState: Int) {
+                isBuffering = playbackState == Player.STATE_BUFFERING
+                if (playbackState == Player.STATE_READY) {
+                    hasPlaybackError = false
+                    isBuffering = false
+                }
                 if (playbackState == Player.STATE_ENDED) {
                     onAutoAdvance()
                 }
@@ -438,6 +506,11 @@ fun SingleEpisodePlayerView(
                     )
                 }
             },
+            update = { view ->
+                if (view.player != exoPlayer) {
+                    view.player = exoPlayer
+                }
+            },
             modifier = Modifier.fillMaxSize()
         )
 
@@ -458,6 +531,76 @@ fun SingleEpisodePlayerView(
                     )
                 )
         )
+
+        // Buffering Indicator
+        if (isBuffering && !hasPlaybackError) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.65f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    color = DramaGold,
+                    strokeWidth = 3.dp,
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+        }
+
+        // Playback Error Overlay with Retry
+        if (hasPlaybackError) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.8f))
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Warning,
+                        contentDescription = "Erro de reprodução",
+                        tint = DramaGold,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Não foi possível carregar este vídeo.",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Tentando restabelecer o link de streaming...",
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            hasPlaybackError = false
+                            hasAttemptedFallback = false
+                            retryCount++
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Tentar Novamente", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
 
         // Floating Hearts from double taps
         hearts.forEach { heart ->

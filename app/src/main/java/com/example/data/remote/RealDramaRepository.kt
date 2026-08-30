@@ -340,8 +340,8 @@ class DramaRepository(context: Context) {
                         dramaId = "drama_01_herdeira",
                         dramaTitle = "O Destino da Herdeira Secreta",
                         episodeCount = 10,
-                        baseVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-                        secondaryVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+                        baseVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+                        secondaryVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
                         thumbnail = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80"
                     )
                 ),
@@ -368,8 +368,8 @@ class DramaRepository(context: Context) {
                         dramaId = "drama_02_vinganca",
                         dramaTitle = "A Vingança da Esposa Perfeita",
                         episodeCount = 12,
-                        baseVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-                        secondaryVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4",
+                        baseVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+                        secondaryVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4",
                         thumbnail = "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=600&auto=format&fit=crop&q=80"
                     )
                 ),
@@ -396,8 +396,8 @@ class DramaRepository(context: Context) {
                         dramaId = "drama_03_magnata",
                         dramaTitle = "O Retorno do Magnata Supremo",
                         episodeCount = 8,
-                        baseVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
-                        secondaryVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+                        baseVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+                        secondaryVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
                         thumbnail = "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&auto=format&fit=crop&q=80"
                     )
                 ),
@@ -424,8 +424,8 @@ class DramaRepository(context: Context) {
                         dramaId = "drama_04_amor_proibido",
                         dramaTitle = "Amor Proibido no Clã Imperial",
                         episodeCount = 10,
-                        baseVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-                        secondaryVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+                        baseVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                        secondaryVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
                         thumbnail = "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop&q=80"
                     )
                 ),
@@ -452,8 +452,8 @@ class DramaRepository(context: Context) {
                         dramaId = "drama_05_guardiao",
                         dramaTitle = "O Guarda-Costas do Destino",
                         episodeCount = 8,
-                        baseVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-                        secondaryVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+                        baseVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+                        secondaryVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
                         thumbnail = "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&auto=format&fit=crop&q=80"
                     )
                 ),
@@ -480,8 +480,8 @@ class DramaRepository(context: Context) {
                         dramaId = "drama_06_comedia",
                         dramaTitle = "Contrato de Noivado por Acidente",
                         episodeCount = 10,
-                        baseVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
-                        secondaryVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+                        baseVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
+                        secondaryVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
                         thumbnail = "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop&q=80"
                     )
                 ),
@@ -508,8 +508,8 @@ class DramaRepository(context: Context) {
                         dramaId = "drama_07_imperio_historico",
                         dramaTitle = "A Princesa Guerreira do Reino Perdido",
                         episodeCount = 12,
-                        baseVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
-                        secondaryVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+                        baseVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+                        secondaryVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
                         thumbnail = "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600&auto=format&fit=crop&q=80"
                     )
                 ),
@@ -536,8 +536,8 @@ class DramaRepository(context: Context) {
                         dramaId = "drama_08_pacto_misterio",
                         dramaTitle = "Segredos na Mansão das Sombras",
                         episodeCount = 8,
-                        baseVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-                        secondaryVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+                        baseVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+                        secondaryVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
                         thumbnail = "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&auto=format&fit=crop&q=80"
                     )
                 )

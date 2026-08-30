@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -35,6 +37,7 @@ import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -131,6 +134,7 @@ fun PublishDramaScreen(
     var newDramaNameInput by remember { mutableStateOf("") }
     var episodeToRename by remember { mutableStateOf<Pair<Drama, com.example.data.model.Episode>?>(null) }
     var newEpisodeNameInput by remember { mutableStateOf("") }
+    var showStorageHelpDialog by remember { mutableStateOf(false) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -168,11 +172,11 @@ fun PublishDramaScreen(
 
     // Sample Preset Videos
     val presetVideos = listOf(
-        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" to "Trailer de Ação HD",
-        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" to "Cena Dramática CEO",
-        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4" to "Romance & Suspense",
-        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" to "Comédia & Leveza",
-        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" to "Épico Fantasia"
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" to "Trailer de Ação HD",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" to "Cena Dramática CEO",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4" to "Romance & Suspense",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" to "Comédia & Leveza",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" to "Épico Fantasia"
     )
 
     // Dialog for renaming drama
@@ -290,6 +294,102 @@ fun PublishDramaScreen(
         )
     }
 
+    // Dialog: Como Configurar Firebase Storage
+    if (showStorageHelpDialog) {
+        AlertDialog(
+            onDismissRequest = { showStorageHelpDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = DramaGold, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Configurar Firebase Storage", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = "Para armazenar vídeos MP4 e imagens na nuvem para todos os usuários online:",
+                        color = TextSecondary,
+                        fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "1. Ativar o Cloud Storage no Console:",
+                        color = DramaGold,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "Acesse console.firebase.google.com -> Selecione seu projeto -> No menu lateral clique em 'Storage' -> Clique no botão 'Começar' (Get started).",
+                        color = TextPrimary,
+                        fontSize = 12.sp
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "2. Configurar Regras de Segurança (Rules):",
+                        color = DramaGold,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "Na aba 'Rules' do Storage, defina para permitir uploads de criadores:\n\nrules_version = '2';\nservice firebase.storage {\n  match /b/{bucket}/o {\n    match /{allPaths=**} {\n      allow read, write: if true;\n    }\n  }\n}",
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(DarkSurface, RoundedCornerShape(6.dp))
+                            .padding(8.dp)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "3. Arquivo google-services.json:",
+                        color = DramaGold,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "Baixe o arquivo 'google-services.json' em Configurações do Projeto Firebase e substitua o arquivo dentro da pasta /app do seu repositório antes de gerar o APK.",
+                        color = TextPrimary,
+                        fontSize = 12.sp
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = DarkSurfaceHighlight.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "O app possui fallback automático: seus vídeos salvam e reproduzem instantaneamente mesmo antes de ativar o bucket!",
+                                color = TextPrimary,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showStorageHelpDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson)
+                ) {
+                    Text("Entendido")
+                }
+            },
+            containerColor = DarkSurfaceElevated
+        )
+    }
+
     Box(modifier = modifier.fillMaxSize().background(DarkBackground)) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Header
@@ -300,7 +400,7 @@ fun PublishDramaScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Publicar & Upload",
                         style = MaterialTheme.typography.titleLarge.copy(
@@ -314,14 +414,29 @@ fun PublishDramaScreen(
                     )
                 }
 
-                if (currentUser != null) {
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(DramaGold.copy(alpha = 0.2f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { showStorageHelpDialog = true },
+                        modifier = Modifier.size(36.dp)
                     ) {
-                        Text("Criador", color = DramaGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Icon(
+                            Icons.Filled.Info,
+                            contentDescription = "Guia do Firebase Storage",
+                            tint = DramaGold,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    if (currentUser != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(DramaGold.copy(alpha = 0.2f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text("Criador", color = DramaGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
