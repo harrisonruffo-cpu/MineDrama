@@ -45,24 +45,22 @@ jobs:
           GOOGLE_API_KEY=DEFAULT_GOOGLE_API_KEY
           EOF
 
-      - name: Setup Gradle Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Build Debug APK with Gradle
         env:
-          JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
+          JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8 -Dksp.use.ksp2=true"
         run: |
-          # Generate Gradle wrapper to avoid host/wrapper mismatch
-          gradle wrapper
-          chmod +x gradlew
-          ./gradlew :app:assembleDebug --stacktrace --no-daemon -Djava.awt.headless=true -Dorg.gradle.configuration-cache=false
+          if [ ! -f "gradlew" ]; then
+            gradle wrapper || true
+          fi
+          chmod +x gradlew 2>/dev/null || true
+          if [ -f "gradlew" ]; then
+            ./gradlew :app:assembleDebug --stacktrace -Dorg.gradle.configuration-cache=false -Dksp.use.ksp2=true -Dksp.run.in.process=false
+          else
+            gradle :app:assembleDebug --stacktrace -Dorg.gradle.configuration-cache=false -Dksp.use.ksp2=true -Dksp.run.in.process=false
+          fi
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
