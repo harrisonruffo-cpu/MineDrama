@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -22,27 +22,84 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | sdkmanager --licenses || true
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
 
-      - name: Prepare Signing & Environment
+      - name: Prepare Secrets, Configs and Signing
         run: |
+          # 1. Restore debug.keystore or create fresh one
           if [ -f "debug.keystore.base64" ]; then
             base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || base64 --decode debug.keystore.base64 > debug.keystore 2>/dev/null || true
           fi
           if [ ! -f "debug.keystore" ] || [ ! -s "debug.keystore" ]; then
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
-          touch .env .env.example
-          echo "GOOGLE_API_KEY=" >> .env
-          echo "FIREBASE_APPCHECK_DEBUG_TOKEN=" >> .env
+          mkdir -p ~/.android
+          cp debug.keystore ~/.android/debug.keystore || true
+
+          # 2. Ensure .env and .env.example exist with non-empty default values
+          cat << 'EOF' > .env.example
+          GEMINI_API_KEY=DEFAULT_GEMINI_API_KEY
+          GOOGLE_API_KEY=DEFAULT_GOOGLE_API_KEY
+          EOF
+
+          cat << 'EOF' > .env
+          GEMINI_API_KEY=DEFAULT_GEMINI_API_KEY
+          GOOGLE_API_KEY=DEFAULT_GOOGLE_API_KEY
+          EOF
+
+          # 3. Ensure google-services.json exists
+          if [ ! -f "app/google-services.json" ]; then
+            cat << 'EOF' > app/google-services.json
+          {
+            "project_info": {
+              "project_number": "123456789012",
+              "project_id": "mine-drama-app",
+              "storage_bucket": "mine-drama-app.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890abcdef",
+                  "android_client_info": {
+                    "package_name": "com.aistudio.minidrama.vjklmq"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "AIzaSyMockKeyForCIBuildOnly0123456789"
+                  }
+                ],
+                "services": {
+                  "analytics_service": {
+                    "status": 1
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+          fi
 
       - name: Build Debug APK
-        run: gradle :app:assembleDebug --stacktrace --no-daemon -Djava.awt.headless=true -Dorg.gradle.configuration-cache=false
+        env:
+          JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=\"-Xmx4g -Dfile.encoding=UTF-8 -Djava.awt.headless=true\" -Djava.awt.headless=true"
+        run: |
+          gradle :app:assembleDebug --stacktrace --no-daemon -Djava.awt.headless=true -Dorg.gradle.configuration-cache=false
 
-      - name: Upload Debug APK
+      - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: mine-drama-debug-apk
