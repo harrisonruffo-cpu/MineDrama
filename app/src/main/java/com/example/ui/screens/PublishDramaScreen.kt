@@ -112,6 +112,8 @@ fun PublishDramaScreen(
     val isPublishing by viewModel.isPublishing.collectAsState()
     val allDramas by viewModel.allDramas.collectAsState()
 
+    val uploadProgress by viewModel.uploadProgress.collectAsState()
+
     var selectedModeTab by remember { mutableIntStateOf(0) } // 0: Novo Drama, 1: Meus Vídeos / Renomear
 
     // Form state
@@ -132,20 +134,14 @@ fun PublishDramaScreen(
 
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    // Media pickers
+    // Media pickers with direct Cloud Storage Uri readying
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let { pickedUri ->
+            posterUrl = pickedUri.toString()
             coroutineScope.launch {
-                val savedPath = com.example.data.util.MediaStorageHelper.copyUriToInternalStorage(
-                    context = context,
-                    uri = pickedUri,
-                    subfolder = "covers",
-                    prefix = "cover"
-                )
-                posterUrl = savedPath
-                snackbarHostState.showSnackbar("Imagem de capa selecionada e pronta para publicação!")
+                snackbarHostState.showSnackbar("Imagem de capa selecionada para envio ao Cloud Storage!")
             }
         }
     }
@@ -154,15 +150,9 @@ fun PublishDramaScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let { pickedUri ->
+            videoUrl = pickedUri.toString()
             coroutineScope.launch {
-                val savedPath = com.example.data.util.MediaStorageHelper.copyUriToInternalStorage(
-                    context = context,
-                    uri = pickedUri,
-                    subfolder = "videos",
-                    prefix = "video"
-                )
-                videoUrl = savedPath
-                snackbarHostState.showSnackbar("Vídeo importado e pronto para publicação online!")
+                snackbarHostState.showSnackbar("Vídeo MP4 pronto para upload online no Cloud Storage!")
             }
         }
     }
@@ -644,6 +634,55 @@ fun PublishDramaScreen(
                         }
                     }
 
+                    // Upload Progress and Publishing Card
+                    if (uploadProgress.isUploading) {
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth().border(1.dp, DramaGold, RoundedCornerShape(12.dp))
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        CircularProgressIndicator(
+                                            progress = { uploadProgress.progressPercent / 100f },
+                                            modifier = Modifier.size(28.dp),
+                                            color = DramaGold,
+                                            strokeWidth = 3.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Upload Online para a Nuvem",
+                                                color = TextPrimary,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp
+                                            )
+                                            Text(
+                                                text = uploadProgress.currentStep,
+                                                color = DramaCrimsonBright,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                        Text(
+                                            text = "${uploadProgress.progressPercent}%",
+                                            color = DramaGold,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    androidx.compose.material3.LinearProgressIndicator(
+                                        progress = { uploadProgress.progressPercent / 100f },
+                                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                        color = DramaGold,
+                                        trackColor = DarkSurfaceHighlight
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // Publish Button
                     item {
                         Button(
@@ -665,7 +704,7 @@ fun PublishDramaScreen(
                                 viewModel.publishNewDrama(
                                     title = dramaTitle.trim(),
                                     originalTitle = originalTitle.trim(),
-                                    synopsis = synopsis.ifBlank { "Minissérie dramática exclusiva publicada na Mine Drama." },
+                                    synopsis = synopsis.ifBlank { "Minissérie dramática exclusiva publicada na Litoral Novelas." },
                                     category = selectedCategory,
                                     posterUrl = posterUrl,
                                     bannerUrl = posterUrl,
@@ -674,7 +713,7 @@ fun PublishDramaScreen(
                                     durationSeconds = durationSeconds.toIntOrNull() ?: 120,
                                     onSuccess = {
                                         coroutineScope.launch {
-                                            snackbarHostState.showSnackbar("Vídeo e drama publicados com sucesso para todos os usuários online!")
+                                            snackbarHostState.showSnackbar("Vídeo e novela publicados com sucesso para todos os usuários online!")
                                         }
                                         // Reset fields
                                         dramaTitle = ""
@@ -699,7 +738,7 @@ fun PublishDramaScreen(
                             if (isPublishing) {
                                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
                                 Spacer(modifier = Modifier.width(10.dp))
-                                Text("Publicando Online...", fontWeight = FontWeight.Bold, color = Color.White)
+                                Text("Enviando para a Nuvem...", fontWeight = FontWeight.Bold, color = Color.White)
                             } else {
                                 Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = Color.White)
                                 Spacer(modifier = Modifier.width(8.dp))

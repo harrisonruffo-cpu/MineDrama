@@ -105,6 +105,8 @@ dependencies {
   implementation(libs.firebase.ai)
   // Firestore for real-time drama and episode metadata sync
   implementation(libs.firebase.firestore)
+  // Firebase Cloud Storage for remote videos and covers
+  implementation(libs.firebase.storage)
 
   // Firebase Auth and Google Sign-In via Credential Manager
   implementation(libs.firebase.auth)

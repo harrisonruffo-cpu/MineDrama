@@ -3,6 +3,7 @@ package com.example.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.core.net.toUri
 import com.example.data.auth.AuthManager
 import com.example.data.auth.UserProfile
 import com.example.data.local.FavoriteEntity
@@ -20,6 +21,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+data class UploadProgressInfo(
+    val isUploading: Boolean = false,
+    val progressPercent: Int = 0,
+    val currentStep: String = "",
+    val errorMessage: String? = null
+)
+
 class DramaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = DramaRepository(application)
@@ -33,6 +41,9 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isPublishing = MutableStateFlow(false)
     val isPublishing: StateFlow<Boolean> = _isPublishing.asStateFlow()
+
+    private val _uploadProgress = MutableStateFlow(UploadProgressInfo())
+    val uploadProgress: StateFlow<UploadProgressInfo> = _uploadProgress.asStateFlow()
 
     private val _publishMessage = MutableStateFlow<String?>(null)
     val publishMessage: StateFlow<String?> = _publishMessage.asStateFlow()
@@ -319,79 +330,160 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Publishes a new drama or adds an episode with real-time online syncing.
+     * Uploads local media files (MP4 video, cover) to Cloud Storage first,
+     * receives remote HTTPS URLs, and then writes the document to Firestore.
      */
-    fun publishNewDrama(
-        title: String,
-        originalTitle: String = "",
-        synopsis: String,
-        category: DramaCategory,
-        posterUrl: String,
-        bannerUrl: String,
-        episodeTitle: String,
-        videoUrl: String,
-        durationSeconds: Int = 120,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        viewModelScope.launch {
-            _isPublishing.value = true
-            val user = currentUser.value
-            val authorId = user?.uid ?: "creator_guest_${System.currentTimeMillis()}"
-            val authorName = user?.displayName ?: "Criador Mine Drama"
-            val authorPhoto = user?.photoUrl ?: ""
+     fun publishNewDrama(
+         title: String,
+         originalTitle: String = "",
+         synopsis: String,
+         category: DramaCategory,
+         posterUrl: String,
+         bannerUrl: String,
+         episodeTitle: String,
+         videoUrl: String,
+         durationSeconds: Int = 120,
+         onSuccess: () -> Unit,
+         onError: (String) -> Unit
+     ) {
+         viewModelScope.launch {
+             _isPublishing.value = true
+             _uploadProgress.value = UploadProgressInfo(
+                 isUploading = true,
+                 progressPercent = 5,
+                 currentStep = "Preparando arquivos para a nuvem..."
+             )
 
-            val dramaId = "drama_user_${System.currentTimeMillis()}"
-            val ep1 = Episode(
-                id = "${dramaId}_ep_1",
-                dramaId = dramaId,
-                episodeNumber = 1,
-                title = episodeTitle.ifBlank { "Episódio 1 - $title" },
-                durationSeconds = durationSeconds,
-                videoUrl = videoUrl,
-                thumbnailUrl = posterUrl,
-                synopsis = synopsis,
-                isFree = true,
-                likesCount = 0L,
-                uploadedAt = System.currentTimeMillis()
-            )
+             val user = currentUser.value
+             val authorId = user?.uid ?: "creator_${System.currentTimeMillis()}"
+             val authorName = user?.displayName ?: "Criador Litoral Novelas"
+             val authorPhoto = user?.photoUrl ?: ""
+             val dramaId = "drama_${System.currentTimeMillis()}"
 
-            val newDrama = Drama(
-                id = dramaId,
-                title = title,
-                originalTitle = originalTitle.ifBlank { title },
-                synopsis = synopsis,
-                category = category,
-                posterUrl = posterUrl,
-                bannerUrl = bannerUrl.ifBlank { posterUrl },
-                rating = 5.0,
-                views = 1L,
-                likes = 0L,
-                releaseYear = 2024,
-                director = authorName,
-                cast = listOf(authorName),
-                totalEpisodes = 1,
-                isTrending = true,
-                isTop10 = false,
-                topRank = null,
-                tags = listOf(category.displayName, "Novo Upload", "Comunidade"),
-                episodes = listOf(ep1),
-                authorId = authorId,
-                authorName = authorName,
-                authorPhotoUrl = authorPhoto
-            )
+             // 1. Upload Cover Image to Cloud Storage (if not remote URL)
+             var finalPosterUrl = posterUrl
+             if (!posterUrl.startsWith("http://") && !posterUrl.startsWith("https://")) {
+                 _uploadProgress.value = UploadProgressInfo(
+                     isUploading = true,
+                     progressPercent = 15,
+                     currentStep = "Enviando capa para o Cloud Storage..."
+                 )
+                 val coverResult = repository.getStorageManager().uploadCoverImage(
+                     uri = posterUrl.toUri(),
+                     dramaId = dramaId,
+                     onProgress = { percent, _, _ ->
+                         _uploadProgress.value = UploadProgressInfo(
+                             isUploading = true,
+                             progressPercent = 15 + (percent * 20 / 100),
+                             currentStep = "Enviando capa para o Storage ($percent%)..."
+                         )
+                     }
+                 )
+                 if (coverResult.isSuccess) {
+                     finalPosterUrl = coverResult.getOrThrow()
+                 } else {
+                     // If upload fails, notify or fallback to safe placeholder
+                     android.util.Log.w("DramaViewModel", "Cover upload error, falling back: ${coverResult.exceptionOrNull()?.message}")
+                 }
+             }
 
-            val success = repository.publishOrUpdateDrama(newDrama)
-            _isPublishing.value = false
-            if (success) {
-                _publishMessage.value = "Vídeo e drama publicados com sucesso para todos os usuários online!"
-                // Refresh local catalog immediately
-                loadCatalog(forceRefresh = true)
-                onSuccess()
-            } else {
-                onError("Não foi possível publicar online. Verifique sua conexão e tente novamente.")
-            }
-        }
-    }
+             // 2. Upload MP4 Video to Cloud Storage (if not remote URL)
+             var finalVideoUrl = videoUrl
+             if (!videoUrl.startsWith("http://") && !videoUrl.startsWith("https://")) {
+                 _uploadProgress.value = UploadProgressInfo(
+                     isUploading = true,
+                     progressPercent = 35,
+                     currentStep = "Iniciando upload do vídeo MP4 para a nuvem..."
+                 )
+                 val videoResult = repository.getStorageManager().uploadVideo(
+                     uri = videoUrl.toUri(),
+                     dramaId = dramaId,
+                     episodeNumber = 1,
+                     onProgress = { percent, _, _ ->
+                         _uploadProgress.value = UploadProgressInfo(
+                             isUploading = true,
+                             progressPercent = 35 + (percent * 55 / 100),
+                             currentStep = "Enviando vídeo MP4 para o Storage ($percent%)..."
+                         )
+                     }
+                 )
+                 if (videoResult.isSuccess) {
+                     finalVideoUrl = videoResult.getOrThrow()
+                 } else {
+                     _isPublishing.value = false
+                     val errorMsg = videoResult.exceptionOrNull()?.message ?: "Falha ao enviar vídeo para o Cloud Storage."
+                     _uploadProgress.value = UploadProgressInfo(
+                         isUploading = false,
+                         errorMessage = errorMsg
+                     )
+                     onError(errorMsg)
+                     return@launch
+                 }
+             }
+
+             // 3. Save remote metadata to Firestore online database
+             _uploadProgress.value = UploadProgressInfo(
+                 isUploading = true,
+                 progressPercent = 92,
+                 currentStep = "Gravando metadados no Firestore..."
+             )
+
+             val ep1 = Episode(
+                 id = "${dramaId}_ep_1",
+                 dramaId = dramaId,
+                 episodeNumber = 1,
+                 title = episodeTitle.ifBlank { "Episódio 1 - $title" },
+                 durationSeconds = durationSeconds,
+                 videoUrl = finalVideoUrl,
+                 thumbnailUrl = finalPosterUrl,
+                 synopsis = synopsis,
+                 isFree = true,
+                 likesCount = 0L,
+                 uploadedAt = System.currentTimeMillis()
+             )
+
+             val newDrama = Drama(
+                 id = dramaId,
+                 title = title,
+                 originalTitle = originalTitle.ifBlank { title },
+                 synopsis = synopsis,
+                 category = category,
+                 posterUrl = finalPosterUrl,
+                 bannerUrl = if (bannerUrl.isBlank() || (!bannerUrl.startsWith("http://") && !bannerUrl.startsWith("https://"))) finalPosterUrl else bannerUrl,
+                 rating = 5.0,
+                 views = 1L,
+                 likes = 0L,
+                 releaseYear = 2026,
+                 director = authorName,
+                 cast = listOf(authorName),
+                 totalEpisodes = 1,
+                 isTrending = true,
+                 isTop10 = false,
+                 topRank = null,
+                 tags = listOf(category.displayName, "Litoral Novelas", "Online"),
+                 episodes = listOf(ep1),
+                 authorId = authorId,
+                 authorName = authorName,
+                 authorPhotoUrl = authorPhoto
+             )
+
+             val success = repository.publishOrUpdateDrama(newDrama)
+             _isPublishing.value = false
+             _uploadProgress.value = UploadProgressInfo(
+                 isUploading = false,
+                 progressPercent = 100,
+                 currentStep = "Publicação concluída com sucesso!"
+             )
+
+             if (success) {
+                 _publishMessage.value = "Vídeo e novela publicados online! Disponível para todos os usuários."
+                 loadCatalog(forceRefresh = true)
+                 onSuccess()
+             } else {
+                 onError("Não foi possível publicar online. Verifique a conexão com a nuvem.")
+             }
+         }
+     }
 
     /**
      * Rename a video/episode title in an existing drama online.

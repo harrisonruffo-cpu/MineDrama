@@ -27,7 +27,10 @@ class DramaRepository(context: Context) {
 
     private val dramaDao = AppDatabase.getDatabase(context).dramaDao()
     private val firestoreDataSource = FirestoreDramaDataSource()
+    private val storageManager = FirebaseStorageManager(context)
     private val localPublishedStore = LocalPublishedDramaStore(context)
+
+    fun getStorageManager(): FirebaseStorageManager = storageManager
 
     private val moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())

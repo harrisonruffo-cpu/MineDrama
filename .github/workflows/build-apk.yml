@@ -1,4 +1,4 @@
-name: Build & Release Android APK
+name: Build & Release Litoral Novelas APK
 
 on:
   push:
@@ -17,22 +17,24 @@ on:
 
 jobs:
   build:
-    name: Build Android APK
+    name: Compilar APK Android
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
-      - name: Checkout repository
+      - name: Checkout do Repositório
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Configurar JDK 17 (Temurin)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Prepare Android Signing & Environment
+      - name: Preparar Assinatura Debug e Variáveis de Ambiente
         run: |
-          # 1. Ensure debug.keystore is present
+          # 1. Recuperar ou gerar debug.keystore
           if [ -f "debug.keystore.base64" ]; then
             base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || base64 --decode debug.keystore.base64 > debug.keystore 2>/dev/null || true
           fi
@@ -42,7 +44,7 @@ jobs:
           mkdir -p ~/.android
           cp debug.keystore ~/.android/debug.keystore || true
 
-          # 2. Setup .env and .env.example
+          # 2. Configurar arquivos .env
           cat << 'EOF' > .env.example
           GEMINI_API_KEY=DEFAULT_GEMINI_API_KEY
           GOOGLE_API_KEY=DEFAULT_GOOGLE_API_KEY
@@ -53,17 +55,17 @@ jobs:
           GOOGLE_API_KEY=DEFAULT_GOOGLE_API_KEY
           EOF
 
-      - name: Setup Gradle
+      - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Grant execute permission for gradlew
+      - name: Garantir Permissão de Execução no Gradle Wrapper
         run: |
           if [ ! -f "gradlew" ]; then
             gradle wrapper || true
           fi
           chmod +x gradlew 2>/dev/null || true
 
-      - name: Build APK with Gradle
+      - name: Compilar APK (:app:assembleDebug)
         env:
           JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8 -Dksp.use.ksp2=true"
         run: |
@@ -73,32 +75,38 @@ jobs:
             gradle :app:assembleDebug --stacktrace -Dorg.gradle.configuration-cache=false -Dksp.use.ksp2=true -Dksp.run.in.process=false
           fi
 
-      - name: Organize & Rename Output APK
+      - name: Organizar e Renomear APK de Saída
         run: |
           mkdir -p release-apk
-          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apk/MineDrama-app-debug.apk \;
+          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apk/LitoralNovelas-app-debug.apk \;
           echo "APK gerado com sucesso:"
           ls -lh release-apk/
 
-      - name: Upload APK to Artifacts
+      - name: Salvar APK nos Artifacts do GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: MineDrama-APK
-          path: release-apk/MineDrama-app-debug.apk
+          name: LitoralNovelas-APK
+          path: release-apk/LitoralNovelas-app-debug.apk
           retention-days: 30
 
-      - name: Create GitHub Release (Optional / On Tag or Input)
+      - name: Criar GitHub Release Oficial
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.create_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          files: release-apk/MineDrama-app-debug.apk
-          name: Release ${{ github.ref_name || 'v1.0.0' }}
+          files: release-apk/LitoralNovelas-app-debug.apk
+          name: Litoral Novelas ${{ github.ref_name || 'v1.0.0' }}
           body: |
-            ## 📱 Mine Drama - APK Pronto para Instalação
+            ## 🌊 Litoral Novelas - APK Oficial para Instalação
 
-            - **Download do APK**: Baixe o arquivo `MineDrama-app-debug.apk` abaixo e instale diretamente no seu dispositivo Android.
-            - **Recursos**: Streaming vertical em alta resolução, publicação online e local de novelas e suporte a contas Google.
+            - **Download do APK**: Baixe o arquivo `LitoralNovelas-app-debug.apk` abaixo e instale diretamente no seu aparelho Android.
+            - **Recursos**:
+              - Streaming vertical de alta performance com reprodução contínua e imersiva.
+              - Armazenamento em nuvem com Firebase Cloud Storage e Cloud Firestore para persistência global.
+              - Autenticação e sincronização com Contas Google e E-mail.
+              - Publicação direta de vídeos MP4 e capas personalizadas.
+              - Gerenciamento de histórico de visualização e favoritos salvos na nuvem.
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
