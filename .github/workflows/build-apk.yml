@@ -22,14 +22,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.13'
-
-      - name: Prepare Signing, Secrets and Configs
+      - name: Prepare Secrets and Signing Files
         run: |
-          # 1. Restore debug.keystore or generate valid one
+          # 1. Ensure debug.keystore is present and valid
           if [ -f "debug.keystore.base64" ]; then
             base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || base64 --decode debug.keystore.base64 > debug.keystore 2>/dev/null || true
           fi
@@ -39,56 +34,25 @@ jobs:
           mkdir -p ~/.android
           cp debug.keystore ~/.android/debug.keystore || true
 
-          # 2. Ensure .env and .env.example exist with valid non-empty values
-          if [ ! -f ".env" ]; then
-            echo 'GEMINI_API_KEY=DEFAULT_GEMINI_API_KEY' > .env
-            echo 'GOOGLE_API_KEY=DEFAULT_GOOGLE_API_KEY' >> .env
-          fi
-          if [ ! -f ".env.example" ]; then
-            echo 'GEMINI_API_KEY=DEFAULT_GEMINI_API_KEY' > .env.example
-            echo 'GOOGLE_API_KEY=DEFAULT_GOOGLE_API_KEY' >> .env.example
-          fi
-
-          # 3. Ensure google-services.json exists
-          if [ ! -f "app/google-services.json" ]; then
-            cat << 'EOF' > app/google-services.json
-          {
-            "project_info": {
-              "project_number": "123456789012",
-              "project_id": "mine-drama-app",
-              "storage_bucket": "mine-drama-app.appspot.com"
-            },
-            "client": [
-              {
-                "client_info": {
-                  "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890abcdef",
-                  "android_client_info": {
-                    "package_name": "com.aistudio.minidrama.vjklmq"
-                  }
-                },
-                "oauth_client": [],
-                "api_key": [
-                  {
-                    "current_key": "AIzaSyMockKeyForCIBuildOnly0123456789"
-                  }
-                ],
-                "services": {
-                  "analytics_service": {
-                    "status": 1
-                  }
-                }
-              }
-            ],
-            "configuration_version": "1"
-          }
+          # 2. Setup .env and .env.example
+          cat << 'EOF' > .env.example
+          GEMINI_API_KEY=DEFAULT_GEMINI_API_KEY
+          GOOGLE_API_KEY=DEFAULT_GOOGLE_API_KEY
           EOF
-          fi
 
-      - name: Build Debug APK
+          cat << 'EOF' > .env
+          GEMINI_API_KEY=DEFAULT_GEMINI_API_KEY
+          GOOGLE_API_KEY=DEFAULT_GOOGLE_API_KEY
+          EOF
+
+      - name: Build Debug APK with Gradle
         env:
           JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
         run: |
-          gradle :app:assembleDebug --stacktrace --no-daemon -Djava.awt.headless=true -Dorg.gradle.configuration-cache=false
+          # Generate Gradle wrapper to avoid host/wrapper mismatch
+          gradle wrapper
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --stacktrace --no-daemon -Djava.awt.headless=true -Dorg.gradle.configuration-cache=false
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
