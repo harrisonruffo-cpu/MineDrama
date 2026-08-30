@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -126,7 +127,9 @@ fun PublishDramaScreen(
     var selectedCategory by remember { mutableStateOf(DramaCategory.ROMANCE_CEO) }
     var posterUrl by remember { mutableStateOf("https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80") }
     var episodeTitle by remember { mutableStateOf("Episódio 1 - A Chegada") }
-    var videoUrl by remember { mutableStateOf("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4") }
+    var videoUrl by remember { mutableStateOf("https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4") }
+    var videoSourceType by remember { mutableIntStateOf(0) } // 0: Link Direto / Web, 1: Galeria Local, 2: Presets
+    var directLinkInput by remember { mutableStateOf("") }
     var durationSeconds by remember { mutableStateOf("90") }
 
     // Dialog state for renaming
@@ -672,7 +675,7 @@ fun PublishDramaScreen(
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Text(
-                                    text = "3. Vídeo e Título do Episódio (Renomear)",
+                                    text = "3. Vídeo e Título do Episódio",
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.Bold,
                                         color = DramaGold
@@ -683,7 +686,7 @@ fun PublishDramaScreen(
                                 OutlinedTextField(
                                     value = episodeTitle,
                                     onValueChange = { episodeTitle = it },
-                                    label = { Text("Nome do Vídeo / Episódio *") },
+                                    label = { Text("Nome do Episódio (Exibido no Botão) *") },
                                     placeholder = { Text("Ex: Episódio 1 - O Segredo Revelado") },
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth().testTag("input_episode_title"),
@@ -697,26 +700,124 @@ fun PublishDramaScreen(
                                     )
                                 )
 
-                                Spacer(modifier = Modifier.height(10.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                Text("Origem do Vídeo do Episódio:", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(6.dp))
 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Button(
-                                        onClick = { videoPickerLauncher.launch("video/*") },
-                                        colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceHighlight),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.weight(1f).testTag("pick_video_button")
-                                    ) {
-                                        Icon(Icons.Filled.Movie, contentDescription = null, modifier = Modifier.size(16.dp), tint = TextPrimary)
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Selecionar Vídeo Local", fontSize = 12.sp, color = TextPrimary)
+                                    FilterChip(
+                                        selected = videoSourceType == 0,
+                                        onClick = { videoSourceType = 0 },
+                                        label = { Text("🔗 Link Direto (URL)", fontSize = 11.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = DramaCrimson,
+                                            selectedLabelColor = Color.White,
+                                            containerColor = DarkSurface,
+                                            labelColor = TextSecondary
+                                        )
+                                    )
+                                    FilterChip(
+                                        selected = videoSourceType == 1,
+                                        onClick = { videoSourceType = 1 },
+                                        label = { Text("📁 Galeria / Arquivo", fontSize = 11.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = DramaCrimson,
+                                            selectedLabelColor = Color.White,
+                                            containerColor = DarkSurface,
+                                            labelColor = TextSecondary
+                                        )
+                                    )
+                                    FilterChip(
+                                        selected = videoSourceType == 2,
+                                        onClick = { videoSourceType = 2 },
+                                        label = { Text("🎬 Testes Rápidos", fontSize = 11.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = DramaCrimson,
+                                            selectedLabelColor = Color.White,
+                                            containerColor = DarkSurface,
+                                            labelColor = TextSecondary
+                                        )
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                when (videoSourceType) {
+                                    0 -> {
+                                        // Link Direto: Fica camuflado no botão do episódio
+                                        OutlinedTextField(
+                                            value = directLinkInput,
+                                            onValueChange = {
+                                                directLinkInput = it
+                                                if (it.isNotBlank()) {
+                                                    videoUrl = it.trim()
+                                                }
+                                            },
+                                            label = { Text("Link URL do Vídeo (MP4 / HLS / Web)") },
+                                            placeholder = { Text("https://exemplo.com/meu-video.mp4") },
+                                            singleLine = true,
+                                            leadingIcon = {
+                                                Icon(Icons.Filled.Link, contentDescription = null, tint = DramaGold)
+                                            },
+                                            modifier = Modifier.fillMaxWidth().testTag("input_direct_link"),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = DramaCrimsonBright,
+                                                unfocusedBorderColor = DarkSurfaceHighlight,
+                                                focusedTextColor = TextPrimary,
+                                                unfocusedTextColor = TextPrimary,
+                                                focusedLabelColor = DramaCrimsonBright,
+                                                unfocusedLabelColor = TextSecondary
+                                            )
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = "💡 O link fica 100% camuflado no botão do episódio. Quando o usuário clica no botão (ex: 'Episódio 1'), o vídeo do link é reproduzido instantaneamente em tela cheia.",
+                                            color = DramaGold.copy(alpha = 0.9f),
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                    1 -> {
+                                        // Galeria local
+                                        Button(
+                                            onClick = { videoPickerLauncher.launch("video/*") },
+                                            colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceHighlight),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.fillMaxWidth().testTag("pick_video_button")
+                                        ) {
+                                            Icon(Icons.Filled.Movie, contentDescription = null, modifier = Modifier.size(16.dp), tint = TextPrimary)
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Selecionar Vídeo MP4 do Aparelho", fontSize = 12.sp, color = TextPrimary)
+                                        }
+                                    }
+                                    2 -> {
+                                        // Presets rápidos
+                                        Text("Selecione um vídeo streaming demonstrativo:", color = TextTertiary, fontSize = 11.sp)
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            items(presetVideos) { (url, name) ->
+                                                val isSelected = videoUrl == url
+                                                FilterChip(
+                                                    selected = isSelected,
+                                                    onClick = { videoUrl = url },
+                                                    label = { Text(name, fontSize = 11.sp) },
+                                                    colors = FilterChipDefaults.filterChipColors(
+                                                        selectedContainerColor = DramaGold,
+                                                        selectedLabelColor = Color.Black,
+                                                        containerColor = DarkSurface,
+                                                        labelColor = TextSecondary
+                                                    )
+                                                )
+                                            }
+                                        }
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text("Vídeo selecionado:", color = TextSecondary, fontSize = 12.sp)
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text("Vídeo vinculado ao episódio:", color = TextSecondary, fontSize = 12.sp)
                                 Text(
                                     text = videoUrl,
                                     color = DramaCrimsonBright,
@@ -724,27 +825,6 @@ fun PublishDramaScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text("Ou escolha um vídeo streaming de teste:", color = TextTertiary, fontSize = 11.sp)
-                                Spacer(modifier = Modifier.height(6.dp))
-
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    items(presetVideos) { (url, name) ->
-                                        val isSelected = videoUrl == url
-                                        FilterChip(
-                                            selected = isSelected,
-                                            onClick = { videoUrl = url },
-                                            label = { Text(name, fontSize = 11.sp) },
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = DramaGold,
-                                                selectedLabelColor = Color.Black,
-                                                containerColor = DarkSurface,
-                                                labelColor = TextSecondary
-                                            )
-                                        )
-                                    }
-                                }
                             }
                         }
                     }
@@ -833,6 +913,7 @@ fun PublishDramaScreen(
                                         // Reset fields
                                         dramaTitle = ""
                                         episodeTitle = "Episódio 1"
+                                        directLinkInput = ""
                                         onNavigateToFeed()
                                     },
                                     onError = { err ->
