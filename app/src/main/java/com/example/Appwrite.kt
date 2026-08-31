@@ -1,4 +1,6 @@
-package com.example  // 6a956ae100291007e582
+
+package com.example
+
 import android.content.Context
 import io.appwrite.Client
 import io.appwrite.ID
@@ -6,9 +8,8 @@ import io.appwrite.services.Account
 import io.appwrite.services.Storage
 
 object Appwrite {
-    // ⚠️ SUBSTITUA PELOS SEUS DADOS ⚠️
     private const val ENDPOINT = "https://cloud.appwrite.io/v1"
-    private const val PROJECT_ID = "SEU_PROJECT_ID_AQUI"
+    private const val PROJECT_ID = "6a956ae100291007e582"
 
     lateinit var client: Client
     lateinit var account: Account
