@@ -49,6 +49,41 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
     private val _publishMessage = MutableStateFlow<String?>(null)
     val publishMessage: StateFlow<String?> = _publishMessage.asStateFlow()
 
+    private val _diagnosticResult = MutableStateFlow<com.example.data.remote.CloudDiagnosticResult?>(null)
+    val diagnosticResult: StateFlow<com.example.data.remote.CloudDiagnosticResult?> = _diagnosticResult.asStateFlow()
+
+    private val _isRunningDiagnostic = MutableStateFlow(false)
+    val isRunningDiagnostic: StateFlow<Boolean> = _isRunningDiagnostic.asStateFlow()
+
+    fun runCloudDiagnostic() {
+        viewModelScope.launch {
+            _isRunningDiagnostic.value = true
+            try {
+                val diagnosticManager = com.example.data.remote.CloudDiagnosticManager(getApplication())
+                val result = diagnosticManager.runDiagnostic()
+                _diagnosticResult.value = result
+            } catch (e: Exception) {
+                _diagnosticResult.value = com.example.data.remote.CloudDiagnosticResult(
+                    items = listOf(
+                        com.example.data.remote.DiagnosticItem(
+                            service = "Diagnóstico",
+                            target = "Execução",
+                            isSuccess = false,
+                            message = "Erro ao executar diagnóstico: ${e.message}"
+                        )
+                    ),
+                    summary = "Erro na execução do diagnóstico de nuvem."
+                )
+            } finally {
+                _isRunningDiagnostic.value = false
+            }
+        }
+    }
+
+    fun clearDiagnosticResult() {
+        _diagnosticResult.value = null
+    }
+
     private val _allDramas = MutableStateFlow<List<Drama>>(emptyList())
     val allDramas: StateFlow<List<Drama>> = _allDramas.asStateFlow()
 

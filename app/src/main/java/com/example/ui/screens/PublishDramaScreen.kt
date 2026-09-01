@@ -32,10 +32,13 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Link
@@ -43,6 +46,7 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -118,8 +122,11 @@ fun PublishDramaScreen(
     val allDramas by viewModel.allDramas.collectAsState()
 
     val uploadProgress by viewModel.uploadProgress.collectAsState()
+    val diagnosticResult by viewModel.diagnosticResult.collectAsState()
+    val isRunningDiagnostic by viewModel.isRunningDiagnostic.collectAsState()
 
     var selectedModeTab by remember { mutableIntStateOf(0) } // 0: Novo Drama, 1: Meus Vídeos / Renomear
+    var showDiagnosticDialog by remember { mutableStateOf(false) }
 
     // Form state
     var dramaTitle by remember { mutableStateOf("") }
@@ -394,6 +401,153 @@ fun PublishDramaScreen(
         )
     }
 
+    // Dialog: Diagnóstico de Conexão com a Nuvem
+    if (showDiagnosticDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiagnosticDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.BugReport,
+                        contentDescription = null,
+                        tint = DramaCrimsonBright,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Diagnóstico da Nuvem",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (isRunningDiagnostic) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(color = DramaCrimsonBright, modifier = Modifier.size(36.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    "Testando conexões com Appwrite e Firebase...",
+                                    color = TextSecondary,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    } else if (diagnosticResult != null) {
+                        val report = diagnosticResult!!
+
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (report.items.all { it.isSuccess })
+                                    Color(0xFF1B382B)
+                                else
+                                    Color(0xFF38231B)
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                        ) {
+                            Text(
+                                text = report.summary,
+                                color = if (report.items.all { it.isSuccess }) Color(0xFF81C784) else Color(0xFFFFB74D),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+
+                        report.items.forEach { item ->
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = DarkSurfaceHighlight.copy(alpha = 0.6f)
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = if (item.isSuccess) Icons.Filled.CheckCircle else Icons.Filled.Error,
+                                            contentDescription = null,
+                                            tint = if (item.isSuccess) Color(0xFF4CAF50) else Color(0xFFE53935),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = item.service,
+                                            color = TextPrimary,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "(${item.target})",
+                                            color = TextTertiary,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = item.message,
+                                        color = TextSecondary,
+                                        fontSize = 12.sp
+                                    )
+
+                                    if (!item.hint.isNullOrBlank()) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "👉 Como resolver: ${item.hint}",
+                                            color = DramaGold,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            "Clique no botão abaixo para verificar se o Appwrite e o Firebase estão prontos para receber seus vídeos e dados:",
+                            color = TextSecondary,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.runCloudDiagnostic()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson),
+                    enabled = !isRunningDiagnostic
+                ) {
+                    Text(if (diagnosticResult == null) "Iniciar Teste Agora" else "Repetir Teste")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiagnosticDialog = false }) {
+                    Text("Fechar", color = TextSecondary)
+                }
+            },
+            containerColor = DarkSurfaceElevated
+        )
+    }
+
     Box(modifier = modifier.fillMaxSize().background(DarkBackground)) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Header
@@ -419,6 +573,24 @@ fun PublishDramaScreen(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Botão de Diagnóstico da Nuvem
+                    IconButton(
+                        onClick = {
+                            showDiagnosticDialog = true
+                            if (diagnosticResult == null) {
+                                viewModel.runCloudDiagnostic()
+                            }
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.BugReport,
+                            contentDescription = "Diagnóstico da Nuvem",
+                            tint = DramaCrimsonBright,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
                     IconButton(
                         onClick = { showStorageHelpDialog = true },
                         modifier = Modifier.size(36.dp)
@@ -491,6 +663,65 @@ fun PublishDramaScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFF1E2638)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showDiagnosticDialog = true
+                                    if (diagnosticResult == null) {
+                                        viewModel.runCloudDiagnostic()
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(DramaCrimson.copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Filled.BugReport,
+                                        contentDescription = null,
+                                        tint = DramaCrimsonBright,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Diagnóstico de Nuvem em Tempo Real",
+                                        color = TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        text = "Toque para testar Appwrite e Firebase instantaneamente",
+                                        color = TextSecondary,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                Icon(
+                                    Icons.Filled.PlayArrow,
+                                    contentDescription = null,
+                                    tint = DramaGold,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+
                     item {
                         Card(
                             colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
