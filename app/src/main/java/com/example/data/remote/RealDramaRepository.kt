@@ -16,7 +16,6 @@ class RealDramaRepository(private val context: Context) : DramaApiService {
     private val localStore = LocalPublishedDramaStore(context)
     private val db = AppDatabase.getDatabase(context)
     private val appwriteDS = AppwriteDramaDataSource()
-    private val firestoreDS = FirestoreDramaDataSource()
 
     override suspend fun getTrendingDramas(): List<Drama> = withContext(Dispatchers.IO) {
         val all = syncCloudDramas()
@@ -76,19 +75,16 @@ class RealDramaRepository(private val context: Context) : DramaApiService {
                 )
             }
             db.dramaDao().insertEpisodes(epEntities)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Erro ao gravar no Room: ${e.message}")
         }
 
-        // Tenta sincronizar na nuvem (Appwrite + Firestore)
-        var cloudSuccess = false
+        // Sincroniza no Appwrite Cloud
         try {
             val appwriteOk = appwriteDS.saveDrama(drama)
-            val firestoreOk = firestoreDS.saveDrama(drama)
-            cloudSuccess = appwriteOk || firestoreOk
-            Log.d(TAG, "Sincronização Nuvem: Appwrite=$appwriteOk, Firestore=$firestoreOk")
-        } catch (e: Exception) {
-            Log.w(TAG, "Erro sync nuvem: ${e.message}")
+            Log.d(TAG, "Sincronização Appwrite: $appwriteOk")
+        } catch (e: Throwable) {
+            Log.w(TAG, "Erro sync Appwrite: ${e.message}")
         }
 
         true
@@ -107,16 +103,8 @@ class RealDramaRepository(private val context: Context) : DramaApiService {
         try {
             val appwriteList = appwriteDS.listDramas()
             appwriteList.forEach { mergedMap[it.id] = it }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(TAG, "Falha ao ler do Appwrite: ${e.message}")
-        }
-
-        // 4. NUVEM FIRESTORE
-        try {
-            val firestoreList = firestoreDS.getDramas()
-            firestoreList.forEach { mergedMap[it.id] = it }
-        } catch (e: Exception) {
-            Log.w(TAG, "Falha ao ler do Firestore: ${e.message}")
         }
 
         mergedMap.values.sortedByDescending { it.createdAt }

@@ -23,12 +23,13 @@ class AppwriteStorageManager(private val context: Context) {
             if (!Appwrite.isInitialized) {
                 Appwrite.init(context)
             }
+            val st = Appwrite.storage ?: return@withContext null
             Appwrite.ensureSession()
 
             val tempFile = createTempFileFromUri(uri, "upload_video_$fileName")
             val inputFile = InputFile.fromFile(tempFile)
 
-            val fileResult = Appwrite.storage.createFile(
+            val fileResult = st.createFile(
                 bucketId = Appwrite.BUCKET_VIDEOS,
                 fileId = ID.unique(),
                 file = inputFile
@@ -38,7 +39,7 @@ class AppwriteStorageManager(private val context: Context) {
             Log.d(TAG, "Upload de vídeo com sucesso no Appwrite: $directUrl")
             tempFile.delete()
             directUrl
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Falha no upload do vídeo para o Appwrite: ${e.message}", e)
             null
         }
@@ -52,12 +53,13 @@ class AppwriteStorageManager(private val context: Context) {
             if (!Appwrite.isInitialized) {
                 Appwrite.init(context)
             }
+            val st = Appwrite.storage ?: return@withContext null
             Appwrite.ensureSession()
 
             val tempFile = createTempFileFromUri(uri, "upload_cover_$fileName")
             val inputFile = InputFile.fromFile(tempFile)
 
-            val fileResult = Appwrite.storage.createFile(
+            val fileResult = st.createFile(
                 bucketId = Appwrite.BUCKET_COVERS,
                 fileId = ID.unique(),
                 file = inputFile
@@ -67,7 +69,7 @@ class AppwriteStorageManager(private val context: Context) {
             Log.d(TAG, "Upload de capa com sucesso no Appwrite: $directUrl")
             tempFile.delete()
             directUrl
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Falha no upload da capa para o Appwrite: ${e.message}", e)
             null
         }

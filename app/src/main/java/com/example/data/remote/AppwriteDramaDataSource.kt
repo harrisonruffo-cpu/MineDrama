@@ -17,10 +17,10 @@ class AppwriteDramaDataSource {
 
     suspend fun listDramas(): List<Drama> = withContext(Dispatchers.IO) {
         try {
-            if (!Appwrite.isInitialized) return@withContext emptyList()
+            val db = Appwrite.databases ?: return@withContext emptyList()
             Appwrite.ensureSession()
 
-            val response = Appwrite.databases.listDocuments(
+            val response = db.listDocuments(
                 databaseId = Appwrite.DATABASE_ID,
                 collectionId = Appwrite.COLLECTION_DRAMAS,
                 queries = listOf(
@@ -32,7 +32,7 @@ class AppwriteDramaDataSource {
             response.documents.mapNotNull { doc ->
                 mapDocumentToDrama(doc)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Erro ao listar dramas do Appwrite: ${e.message}")
             emptyList()
         }
@@ -40,7 +40,7 @@ class AppwriteDramaDataSource {
 
     suspend fun saveDrama(drama: Drama): Boolean = withContext(Dispatchers.IO) {
         try {
-            if (!Appwrite.isInitialized) return@withContext false
+            val db = Appwrite.databases ?: return@withContext false
             Appwrite.ensureSession()
 
             val episodesJson = JSONArray().apply {
@@ -77,16 +77,16 @@ class AppwriteDramaDataSource {
 
             try {
                 // Tenta atualizar caso já exista
-                Appwrite.databases.updateDocument(
+                db.updateDocument(
                     databaseId = Appwrite.DATABASE_ID,
                     collectionId = Appwrite.COLLECTION_DRAMAS,
                     documentId = drama.id,
                     data = payload
                 )
                 Log.d(TAG, "Drama atualizado com sucesso no Appwrite: ${drama.id}")
-            } catch (_: Exception) {
+            } catch (_: Throwable) {
                 // Se não existir, cria com o ID especificado
-                Appwrite.databases.createDocument(
+                db.createDocument(
                     databaseId = Appwrite.DATABASE_ID,
                     collectionId = Appwrite.COLLECTION_DRAMAS,
                     documentId = if (drama.id.isNotBlank() && drama.id.length <= 36 && !drama.id.contains(" ")) drama.id else ID.unique(),
@@ -95,7 +95,7 @@ class AppwriteDramaDataSource {
                 Log.d(TAG, "Drama criado com sucesso no Appwrite")
             }
             true
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Falha ao salvar drama no Appwrite: ${e.message}", e)
             false
         }

@@ -3,10 +3,8 @@ package com.example.data.remote
 import android.content.Context
 import android.util.Log
 import com.example.Appwrite
-import com.google.firebase.firestore.FirebaseFirestore
 import io.appwrite.Query
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 data class DiagnosticItem(
@@ -41,7 +39,7 @@ class CloudDiagnosticManager(private val context: Context) {
                         service = "Appwrite Auth",
                         target = "Sessão Anônima / Usuário",
                         isSuccess = true,
-                        message = "Conectado e autenticado com sucesso no Appwrite NYC Cloud (Project: ${Appwrite.PROJECT_ID})"
+                        message = "Conectado com sucesso no Appwrite NYC Cloud (Project: ${Appwrite.PROJECT_ID})"
                     )
                 )
             } else {
@@ -50,12 +48,12 @@ class CloudDiagnosticManager(private val context: Context) {
                         service = "Appwrite Auth",
                         target = "Sessão Anônima",
                         isSuccess = false,
-                        message = "Falha ao criar/recuperar sessão de usuário.",
-                        hint = "Verifique se o Project ID '${Appwrite.PROJECT_ID}' está correto no Appwrite."
+                        message = "Falha ao inicializar sessão de usuário.",
+                        hint = "Verifique o Project ID '${Appwrite.PROJECT_ID}' no Appwrite."
                     )
                 )
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             results.add(
                 DiagnosticItem(
                     service = "Appwrite Auth",
@@ -69,20 +67,33 @@ class CloudDiagnosticManager(private val context: Context) {
 
         // 2. Appwrite Database (Database: litoral_novelas, Collection: dramas)
         try {
-            val response = Appwrite.databases.listDocuments(
-                databaseId = Appwrite.DATABASE_ID,
-                collectionId = Appwrite.COLLECTION_DRAMAS,
-                queries = listOf(Query.limit(1))
-            )
-            results.add(
-                DiagnosticItem(
-                    service = "Appwrite Database",
-                    target = "DB: ${Appwrite.DATABASE_ID} / Col: ${Appwrite.COLLECTION_DRAMAS}",
-                    isSuccess = true,
-                    message = "Sucesso! Total de novelas encontradas: ${response.total}"
+            val db = Appwrite.databases
+            if (db != null) {
+                val response = db.listDocuments(
+                    databaseId = Appwrite.DATABASE_ID,
+                    collectionId = Appwrite.COLLECTION_DRAMAS,
+                    queries = listOf(Query.limit(1))
                 )
-            )
-        } catch (e: Exception) {
+                results.add(
+                    DiagnosticItem(
+                        service = "Appwrite Database",
+                        target = "DB: ${Appwrite.DATABASE_ID} / Col: ${Appwrite.COLLECTION_DRAMAS}",
+                        isSuccess = true,
+                        message = "Sucesso! Total de novelas cadastradas: ${response.total}"
+                    )
+                )
+            } else {
+                results.add(
+                    DiagnosticItem(
+                        service = "Appwrite Database",
+                        target = "DB: ${Appwrite.DATABASE_ID}",
+                        isSuccess = false,
+                        message = "Serviço de Banco não inicializado.",
+                        hint = "Verifique a conectividade de rede."
+                    )
+                )
+            }
+        } catch (e: Throwable) {
             val err = e.message ?: "Desconhecido"
             val hint = when {
                 err.contains("404") || err.contains("not found", ignoreCase = true) ->
@@ -96,7 +107,7 @@ class CloudDiagnosticManager(private val context: Context) {
                     service = "Appwrite Database",
                     target = "DB: ${Appwrite.DATABASE_ID} / Col: ${Appwrite.COLLECTION_DRAMAS}",
                     isSuccess = false,
-                    message = "Erro ao ler/gravar dados: $err",
+                    message = "Erro: $err",
                     hint = hint
                 )
             )
@@ -104,19 +115,31 @@ class CloudDiagnosticManager(private val context: Context) {
 
         // 3. Appwrite Storage Bucket 'videos'
         try {
-            val fileList = Appwrite.storage.listFiles(
-                bucketId = Appwrite.BUCKET_VIDEOS,
-                queries = listOf(Query.limit(1))
-            )
-            results.add(
-                DiagnosticItem(
-                    service = "Appwrite Storage",
-                    target = "Bucket: ${Appwrite.BUCKET_VIDEOS}",
-                    isSuccess = true,
-                    message = "Sucesso! Acesso liberado ao bucket de vídeos (${fileList.total} arquivos)."
+            val st = Appwrite.storage
+            if (st != null) {
+                val fileList = st.listFiles(
+                    bucketId = Appwrite.BUCKET_VIDEOS,
+                    queries = listOf(Query.limit(1))
                 )
-            )
-        } catch (e: Exception) {
+                results.add(
+                    DiagnosticItem(
+                        service = "Appwrite Storage",
+                        target = "Bucket: ${Appwrite.BUCKET_VIDEOS}",
+                        isSuccess = true,
+                        message = "Sucesso! Acesso liberado ao bucket de vídeos (${fileList.total} arquivos)."
+                    )
+                )
+            } else {
+                results.add(
+                    DiagnosticItem(
+                        service = "Appwrite Storage",
+                        target = "Bucket: ${Appwrite.BUCKET_VIDEOS}",
+                        isSuccess = false,
+                        message = "Serviço de Storage não inicializado."
+                    )
+                )
+            }
+        } catch (e: Throwable) {
             val err = e.message ?: "Desconhecido"
             val hint = when {
                 err.contains("404") || err.contains("not found", ignoreCase = true) ->
@@ -138,19 +161,31 @@ class CloudDiagnosticManager(private val context: Context) {
 
         // 4. Appwrite Storage Bucket 'covers'
         try {
-            val fileList = Appwrite.storage.listFiles(
-                bucketId = Appwrite.BUCKET_COVERS,
-                queries = listOf(Query.limit(1))
-            )
-            results.add(
-                DiagnosticItem(
-                    service = "Appwrite Storage",
-                    target = "Bucket: ${Appwrite.BUCKET_COVERS}",
-                    isSuccess = true,
-                    message = "Sucesso! Acesso liberado ao bucket de capas (${fileList.total} arquivos)."
+            val st = Appwrite.storage
+            if (st != null) {
+                val fileList = st.listFiles(
+                    bucketId = Appwrite.BUCKET_COVERS,
+                    queries = listOf(Query.limit(1))
                 )
-            )
-        } catch (e: Exception) {
+                results.add(
+                    DiagnosticItem(
+                        service = "Appwrite Storage",
+                        target = "Bucket: ${Appwrite.BUCKET_COVERS}",
+                        isSuccess = true,
+                        message = "Sucesso! Acesso liberado ao bucket de capas (${fileList.total} arquivos)."
+                    )
+                )
+            } else {
+                results.add(
+                    DiagnosticItem(
+                        service = "Appwrite Storage",
+                        target = "Bucket: ${Appwrite.BUCKET_COVERS}",
+                        isSuccess = false,
+                        message = "Serviço de Storage não inicializado."
+                    )
+                )
+            }
+        } catch (e: Throwable) {
             val err = e.message ?: "Desconhecido"
             val hint = when {
                 err.contains("404") || err.contains("not found", ignoreCase = true) ->
@@ -170,36 +205,12 @@ class CloudDiagnosticManager(private val context: Context) {
             )
         }
 
-        // 5. Firebase Firestore
-        try {
-            val firestore = FirebaseFirestore.getInstance()
-            val snap = firestore.collection("dramas").limit(1).get().await()
-            results.add(
-                DiagnosticItem(
-                    service = "Firebase Firestore",
-                    target = "Coleção: dramas",
-                    isSuccess = true,
-                    message = "Conexão ativa! Documentos disponíveis: ${snap.size()}"
-                )
-            )
-        } catch (e: Exception) {
-            results.add(
-                DiagnosticItem(
-                    service = "Firebase Firestore",
-                    target = "Coleção: dramas",
-                    isSuccess = false,
-                    message = "Aviso: ${e.message}",
-                    hint = "Verifique as Regras de Segurança no Console do Firebase."
-                )
-            )
-        }
-
         val successCount = results.count { it.isSuccess }
         val totalCount = results.size
         val summary = if (successCount == totalCount) {
-            "✅ Todos os serviços de Nuvem estão 100% operacionais e autorizados!"
+            "✅ Todos os serviços do Appwrite NYC Cloud estão 100% operacionais e autorizados!"
         } else {
-            "⚠️ $successCount de $totalCount serviços conectados. Verifique as dicas abaixo para liberar o acesso."
+            "⚠️ $successCount de $totalCount serviços conectados. Verifique as orientações acima para liberar o acesso."
         }
 
         CloudDiagnosticResult(
@@ -208,3 +219,4 @@ class CloudDiagnosticManager(private val context: Context) {
         )
     }
 }
+

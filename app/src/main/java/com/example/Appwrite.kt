@@ -25,47 +25,54 @@ object Appwrite {
     const val BUCKET_VIDEOS = "videos"
     const val BUCKET_COVERS = "covers"
 
-    private lateinit var client: Client
-    lateinit var account: Account
-    lateinit var databases: Databases
-    lateinit var storage: Storage
+    private var _client: Client? = null
+    val client: Client? get() = _client
+
+    private var _account: Account? = null
+    val account: Account? get() = _account
+
+    private var _databases: Databases? = null
+    val databases: Databases? get() = _databases
+
+    private var _storage: Storage? = null
+    val storage: Storage? get() = _storage
 
     var isInitialized = false
         private set
 
     fun init(context: Context) {
-        if (isInitialized) return
+        if (isInitialized && _client != null) return
         try {
-            client = Client(context.applicationContext)
+            val c = Client(context.applicationContext)
                 .setEndpoint(ENDPOINT)
                 .setProject(PROJECT_ID)
 
-            account = Account(client)
-            databases = Databases(client)
-            storage = Storage(client)
+            _client = c
+            _account = Account(c)
+            _databases = Databases(c)
+            _storage = Storage(c)
             isInitialized = true
             Log.d(TAG, "Appwrite inicializado com sucesso no endpoint $ENDPOINT (Project: $PROJECT_ID)")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Erro ao inicializar Appwrite: ${e.message}", e)
         }
     }
 
     suspend fun ensureSession(): Boolean = withContext(Dispatchers.IO) {
-        if (!isInitialized) return@withContext false
+        val acc = _account ?: return@withContext false
         try {
             try {
-                val current = account.get()
+                val current = acc.get()
                 Log.d(TAG, "Sessão ativa existente: ${current.id}")
                 return@withContext true
-            } catch (_: Exception) {
+            } catch (_: Throwable) {
                 // Tenta criar sessão anônima
             }
-            val session = account.createAnonymousSession()
+            val session = acc.createAnonymousSession()
             Log.d(TAG, "Nova sessão anônima criada: ${session.id}")
             true
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(TAG, "Não foi possível criar sessão anônima: ${e.message}")
-            // Mesmo se a criação de sessão anônima falhar por já ter sessão ou modo guest, continua
             true
         }
     }
@@ -78,3 +85,4 @@ object Appwrite {
         return "$ENDPOINT/storage/buckets/$bucketId/files/$fileId/download?project=$PROJECT_ID"
     }
 }
+
