@@ -2,8 +2,8 @@ package com.example.viewmodels
 
 import android.net.Uri
 import android.content.ContentResolver
-import android.lifecycle.ViewModel
-import android.lifecycle.viewModelScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.Appwrite
 import io.appwrite.ID
 import io.appwrite.models.InputFile
