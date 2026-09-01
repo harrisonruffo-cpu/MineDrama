@@ -1,4 +1,3 @@
-
 package com.example.viewmodels
 
 import android.net.Uri
@@ -33,20 +32,12 @@ class VideoUploadViewModel : ViewModel() {
         _state.value = UploadState.Loading
         viewModelScope.launch {
             try {
-                // 1. Converter URI para InputFile
                 val inputFile = InputFile.fromUri(contentResolver, uri)
-
-                // 2. Fazer upload para o Appwrite Storage
                 val response = Appwrite.storage.createFile(
                     bucketId = "videos",
                     fileId = ID.unique(),
                     file = inputFile
                 )
-
-                // 3. Construir URL pública
-                val fileUrl = "https://cloud.appwrite.io/v1/storage/buckets/videos/files/${response.id}/view?project=${Appwrite.PROJECT_ID}"
-
-                // 4. Sucesso!
                 _state.value = UploadState.Success
             } catch (e: Exception) {
                 _state.value = UploadState.Error(e.message ?: "Erro desconhecido")
