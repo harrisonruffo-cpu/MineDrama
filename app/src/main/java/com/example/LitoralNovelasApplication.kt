@@ -23,5 +23,12 @@ class LitoralNovelasApplication : Application() {
         } catch (e: Exception) {
             Log.w("LitoralNovelasApp", "Firebase initialization note: ${e.message}")
         }
+
+        try {
+            Appwrite.init(this)
+            Log.d("LitoralNovelasApp", "Appwrite initialized successfully")
+        } catch (e: Exception) {
+            Log.w("LitoralNovelasApp", "Appwrite initialization error: ${e.message}")
+        }
     }
 }
