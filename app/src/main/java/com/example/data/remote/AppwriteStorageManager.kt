@@ -29,13 +29,14 @@ class AppwriteStorageManager(private val context: Context) {
             val tempFile = createTempFileFromUri(uri, "upload_video_$fileName")
             val inputFile = InputFile.fromFile(tempFile)
 
+            val targetBucket = Appwrite.BUCKET_MEDIA
             val fileResult = st.createFile(
-                bucketId = Appwrite.BUCKET_VIDEOS,
+                bucketId = targetBucket,
                 fileId = ID.unique(),
                 file = inputFile
             )
 
-            val directUrl = Appwrite.getFileViewUrl(Appwrite.BUCKET_VIDEOS, fileResult.id)
+            val directUrl = Appwrite.getFileViewUrl(targetBucket, fileResult.id)
             Log.d(TAG, "Upload de vídeo com sucesso no Appwrite: $directUrl")
             tempFile.delete()
             directUrl
@@ -59,13 +60,14 @@ class AppwriteStorageManager(private val context: Context) {
             val tempFile = createTempFileFromUri(uri, "upload_cover_$fileName")
             val inputFile = InputFile.fromFile(tempFile)
 
+            val targetBucket = Appwrite.BUCKET_MEDIA
             val fileResult = st.createFile(
-                bucketId = Appwrite.BUCKET_COVERS,
+                bucketId = targetBucket,
                 fileId = ID.unique(),
                 file = inputFile
             )
 
-            val directUrl = Appwrite.getFileViewUrl(Appwrite.BUCKET_COVERS, fileResult.id)
+            val directUrl = Appwrite.getFileViewUrl(targetBucket, fileResult.id)
             Log.d(TAG, "Upload de capa com sucesso no Appwrite: $directUrl")
             tempFile.delete()
             directUrl

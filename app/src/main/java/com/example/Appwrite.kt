@@ -14,16 +14,18 @@ object Appwrite {
 
     // Região selecionada pelo usuário: NYC Cloud
     const val ENDPOINT = "https://nyc.cloud.appwrite.io/v1"
-    const val PROJECT_ID = "6a956ae100291007e582"
+    const val PROJECT_ID = "6a973ca90022ac6c7069"
+    const val PROJECT_NAME = "Litoral Novelas"
 
     // Database e Coleções
     const val DATABASE_ID = "litoral_novelas"
     const val COLLECTION_DRAMAS = "dramas"
     const val COLLECTION_EPISODES = "episodes"
 
-    // Buckets de Storage
-    const val BUCKET_VIDEOS = "videos"
-    const val BUCKET_COVERS = "covers"
+    // Bucket de Storage (Unificado para compatibilidade com plano gratuito de 1 único bucket)
+    var BUCKET_MEDIA = "videos"
+    val BUCKET_VIDEOS: String get() = BUCKET_MEDIA
+    val BUCKET_COVERS: String get() = BUCKET_MEDIA
 
     private var _client: Client? = null
     val client: Client? get() = _client

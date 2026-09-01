@@ -77,31 +77,31 @@ jobs:
       - name: Organizar e Renomear APK de Saída
         run: |
           mkdir -p release-apk
-          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apk/LitoralNovelas-v1.1.1.apk \;
+          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apk/LitoralNovelas-v1.1.3.apk \;
           echo "APK gerado com sucesso:"
           ls -lh release-apk/
 
       - name: Publicar APK como Artefato do Workflow
         uses: actions/upload-artifact@v4
         with:
-          name: LitoralNovelas-v1.1.1-APK
-          path: release-apk/LitoralNovelas-v1.1.1.apk
+          name: LitoralNovelas-v1.1.3-APK
+          path: release-apk/LitoralNovelas-v1.1.3.apk
           retention-days: 30
 
       - name: Criar GitHub Release Oficial
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          files: release-apk/LitoralNovelas-v1.1.1.apk
-          name: Litoral Novelas ${{ github.ref_name || 'v1.1.1' }}
-          tag_name: ${{ github.ref_name || 'v1.1.1' }}
+          files: release-apk/LitoralNovelas-v1.1.3.apk
+          name: Litoral Novelas ${{ github.ref_name || 'v1.1.3' }}
+          tag_name: ${{ github.ref_name || 'v1.1.3' }}
           body: |
-            ## 🌊 Litoral Novelas v1.1.1 - Correção Definitiva de Inicialização
+            ## 🌊 Litoral Novelas v1.1.3 - Suporte a Bucket Único de Mídia
 
-            - **Download do APK**: Baixe o arquivo `LitoralNovelas-v1.1.1.apk` abaixo e instale diretamente no seu aparelho Android.
-            - **Correção Crucial**:
-              - 🎯 **Correção do ClassNotFoundException**: Corrigida a divergência entre o namespace e o pacote das classes Java/Kotlin (`com.example`), garantindo que o Android consiga carregar a classe de aplicação e as telas instantaneamente sem fechar.
-              - ⚡ **Appwrite NYC Cloud Nativo**: Conexão com `https://nyc.cloud.appwrite.io/v1`.
+            - **Download do APK**: Baixe o arquivo `LitoralNovelas-v1.1.3.apk` abaixo e instale no seu aparelho Android.
+            - **Novidades desta versão**:
+              - 📦 **Bucket Único de Mídia**: O aplicativo agora unifica o armazenamento de vídeos e capas no mesmo bucket (compatível 100% com o plano gratuito do Appwrite).
+              - 🔍 **Detecção Automática do Bucket**: Reconhece automaticamente o bucket criado (seja `videos`, `media`, `covers` ou qualquer outro nome).
           draft: false
           prerelease: false
         env:

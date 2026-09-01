@@ -113,94 +113,76 @@ class CloudDiagnosticManager(private val context: Context) {
             )
         }
 
-        // 3. Appwrite Storage Bucket 'videos'
+        // 3. Appwrite Storage Bucket (Unificado para Vídeos e Capas - 100% Plano Gratuito)
         try {
             val st = Appwrite.storage
             if (st != null) {
-                val fileList = st.listFiles(
-                    bucketId = Appwrite.BUCKET_VIDEOS,
-                    queries = listOf(Query.limit(1))
-                )
-                results.add(
-                    DiagnosticItem(
-                        service = "Appwrite Storage",
-                        target = "Bucket: ${Appwrite.BUCKET_VIDEOS}",
-                        isSuccess = true,
-                        message = "Sucesso! Acesso liberado ao bucket de vídeos (${fileList.total} arquivos)."
-                    )
-                )
-            } else {
-                results.add(
-                    DiagnosticItem(
-                        service = "Appwrite Storage",
-                        target = "Bucket: ${Appwrite.BUCKET_VIDEOS}",
-                        isSuccess = false,
-                        message = "Serviço de Storage não inicializado."
-                    )
-                )
-            }
-        } catch (e: Throwable) {
-            val err = e.message ?: "Desconhecido"
-            val hint = when {
-                err.contains("404") || err.contains("not found", ignoreCase = true) ->
-                    "Bucket '${Appwrite.BUCKET_VIDEOS}' não existe no Appwrite. Crie em Storage > Create Bucket > ID: '${Appwrite.BUCKET_VIDEOS}'."
-                err.contains("401") || err.contains("unauthorized", ignoreCase = true) || err.contains("permission", ignoreCase = true) ->
-                    "Permissão negada no Bucket '${Appwrite.BUCKET_VIDEOS}'. Vá em Storage > videos > Settings > Permissions > adicione 'Any' (Create, Read, Update)."
-                else -> "Erro no Storage: $err"
-            }
-            results.add(
-                DiagnosticItem(
-                    service = "Appwrite Storage",
-                    target = "Bucket: ${Appwrite.BUCKET_VIDEOS}",
-                    isSuccess = false,
-                    message = "Falha no Bucket de Vídeos: $err",
-                    hint = hint
-                )
-            )
-        }
+                // Tenta com o bucket configurado ou candidatos comuns
+                val candidateBuckets = listOf(Appwrite.BUCKET_MEDIA, "videos", "media", "covers", "default").distinct()
+                var foundBucket: String? = null
+                var totalFiles = 0L
+                var lastErr: String? = null
 
-        // 4. Appwrite Storage Bucket 'covers'
-        try {
-            val st = Appwrite.storage
-            if (st != null) {
-                val fileList = st.listFiles(
-                    bucketId = Appwrite.BUCKET_COVERS,
-                    queries = listOf(Query.limit(1))
-                )
-                results.add(
-                    DiagnosticItem(
-                        service = "Appwrite Storage",
-                        target = "Bucket: ${Appwrite.BUCKET_COVERS}",
-                        isSuccess = true,
-                        message = "Sucesso! Acesso liberado ao bucket de capas (${fileList.total} arquivos)."
+                for (bucketCandidate in candidateBuckets) {
+                    try {
+                        val fileList = st.listFiles(
+                            bucketId = bucketCandidate,
+                            queries = listOf(Query.limit(1))
+                        )
+                        foundBucket = bucketCandidate
+                        totalFiles = fileList.total
+                        Appwrite.BUCKET_MEDIA = bucketCandidate
+                        break
+                    } catch (e: Throwable) {
+                        lastErr = e.message
+                    }
+                }
+
+                if (foundBucket != null) {
+                    results.add(
+                        DiagnosticItem(
+                            service = "Appwrite Storage",
+                            target = "Bucket: $foundBucket (Vídeos e Capas)",
+                            isSuccess = true,
+                            message = "Sucesso! Bucket único conectado ($totalFiles arquivos salvos)."
+                        )
                     )
-                )
+                } else {
+                    val err = lastErr ?: "Bucket não encontrado"
+                    val hint = when {
+                        err.contains("401") || err.contains("unauthorized", ignoreCase = true) || err.contains("permission", ignoreCase = true) ->
+                            "Permissão negada no Bucket. Vá em Storage > seu bucket > Settings > Permissions > adicione 'Any' (Create, Read, Update)."
+                        else ->
+                            "Nenhum bucket encontrado. Crie 1 único bucket em Storage > Create Bucket (ex: ID: 'videos' ou 'media') e adicione permissão 'Any'."
+                    }
+                    results.add(
+                        DiagnosticItem(
+                            service = "Appwrite Storage",
+                            target = "Bucket: ${Appwrite.BUCKET_MEDIA}",
+                            isSuccess = false,
+                            message = "Erro: $err",
+                            hint = hint
+                        )
+                    )
+                }
             } else {
                 results.add(
                     DiagnosticItem(
                         service = "Appwrite Storage",
-                        target = "Bucket: ${Appwrite.BUCKET_COVERS}",
+                        target = "Bucket: ${Appwrite.BUCKET_MEDIA}",
                         isSuccess = false,
                         message = "Serviço de Storage não inicializado."
                     )
                 )
             }
         } catch (e: Throwable) {
-            val err = e.message ?: "Desconhecido"
-            val hint = when {
-                err.contains("404") || err.contains("not found", ignoreCase = true) ->
-                    "Bucket '${Appwrite.BUCKET_COVERS}' não existe no Appwrite. Crie em Storage > Create Bucket > ID: '${Appwrite.BUCKET_COVERS}'."
-                err.contains("401") || err.contains("unauthorized", ignoreCase = true) || err.contains("permission", ignoreCase = true) ->
-                    "Permissão negada no Bucket '${Appwrite.BUCKET_COVERS}'. Vá em Storage > covers > Settings > Permissions > adicione 'Any' (Create, Read, Update)."
-                else -> "Erro no Storage: $err"
-            }
             results.add(
                 DiagnosticItem(
                     service = "Appwrite Storage",
-                    target = "Bucket: ${Appwrite.BUCKET_COVERS}",
+                    target = "Bucket: ${Appwrite.BUCKET_MEDIA}",
                     isSuccess = false,
-                    message = "Falha no Bucket de Capas: $err",
-                    hint = hint
+                    message = "Falha no Storage: ${e.message}",
+                    hint = "Crie 1 bucket no Appwrite com permissão 'Any'."
                 )
             )
         }
