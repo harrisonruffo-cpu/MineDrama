@@ -78,32 +78,32 @@ jobs:
       - name: Organizar e Renomear APK de Saída
         run: |
           mkdir -p release-apk
-          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apk/LitoralNovelas-v1.0.6.apk \;
+          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apk/LitoralNovelas-v1.0.7.apk \;
           echo "APK gerado com sucesso:"
           ls -lh release-apk/
 
       - name: Salvar APK nos Artifacts do GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: LitoralNovelas-v1.0.6-APK
-          path: release-apk/LitoralNovelas-v1.0.6.apk
+          name: LitoralNovelas-v1.0.7-APK
+          path: release-apk/LitoralNovelas-v1.0.7.apk
           retention-days: 30
 
       - name: Criar GitHub Release Oficial
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.create_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          files: release-apk/LitoralNovelas-v1.0.6.apk
-          name: Litoral Novelas ${{ github.ref_name || 'v1.0.6' }}
+          files: release-apk/LitoralNovelas-v1.0.7.apk
+          name: Litoral Novelas ${{ github.ref_name || 'v1.0.7' }}
           body: |
-            ## 🌊 Litoral Novelas v1.0.6 - APK Oficial para Instalação
+            ## 🌊 Litoral Novelas v1.0.7 - APK Oficial para Instalação
 
-            - **Download do APK**: Baixe o arquivo `LitoralNovelas-v1.0.6.apk` abaixo e instale diretamente no seu aparelho Android.
-            - **Novidades da Versão 1.0.6**:
-              - ⚡ **Appwrite Storage Conectado**: Suporte a upload direto de capas e vídeos MP4 para os Buckets do Appwrite com link público.
-              - 🎬 **Interface Principal e Navegação Restauradas**: Renderização corrigida com inicialização segura.
-              - 🔄 **Fallback Multi-Cloud**: Sincronização e redundância automática entre Appwrite e Firebase.
-              - 📱 **Player Otimizado**: Carregamento instantâneo de streaming.
+            - **Download do APK**: Baixe o arquivo `LitoralNovelas-v1.0.7.apk` abaixo e instale diretamente no seu aparelho Android.
+            - **Novidades da Versão 1.0.7**:
+              - ☁️ **Persistência Completa na Nuvem (Appwrite Database + Storage)**: Salva e consulta metadados e episódios diretamente no Appwrite Cloud.
+              - ⚡ **Sessão Anônima Automática no Appwrite**: Garante token de sessão para uploads e criação de documentos sem erros de autorização.
+              - 🔄 **Sincronização Multi-Cloud (Appwrite & Firebase)**: Gravação e leitura redundante em tempo real.
+              - 📱 **Gestão de Vídeos & Renomeação**: Todas as novelas e episódios sincronizados aparecem instantaneamente na aba de gerenciamento.
           draft: false
           prerelease: false
         env:

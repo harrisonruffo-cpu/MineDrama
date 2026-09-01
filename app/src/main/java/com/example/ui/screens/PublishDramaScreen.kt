@@ -975,7 +975,14 @@ fun PublishDramaScreen(
             } else {
                 // Management & Renaming Tab
                 val userUid = currentUser?.uid
-                val userDramas = allDramas.filter { it.authorId.isNotBlank() && it.authorId == userUid || it.id.startsWith("drama_user_") }
+                val userDramas = allDramas.filter { drama ->
+                    (userUid != null && drama.authorId == userUid) ||
+                    drama.id.startsWith("drama_user_") ||
+                    drama.id.startsWith("drama_1") ||
+                    drama.id.startsWith("drama_2") ||
+                    drama.authorName.contains("Litoral", ignoreCase = true) ||
+                    drama.authorId.startsWith("creator_")
+                }
 
                 if (userDramas.isEmpty()) {
                     Box(

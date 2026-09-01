@@ -28,6 +28,11 @@ object AppwriteStorageManager {
         mimeType: String = "video/mp4"
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
+            if (!Appwrite.isInitialized) {
+                Appwrite.init(context)
+            }
+            Appwrite.ensureSession()
+
             val contentResolver = context.contentResolver
             val tempFile = File(context.cacheDir, "appwrite_upload_${System.currentTimeMillis()}")
             
@@ -49,12 +54,12 @@ object AppwriteStorageManager {
 
             // Constrói URL direta pública de visualização/stream
             val fileUrl = "https://cloud.appwrite.io/v1/storage/buckets/$bucketId/files/${response.id}/view?project=${Appwrite.PROJECT_ID}"
-            Log.d(TAG, "Upload concluído no Appwrite: $fileUrl")
+            Log.d(TAG, "Upload concluído com sucesso no Appwrite: $fileUrl")
             
             tempFile.delete()
             Result.success(fileUrl)
         } catch (e: Exception) {
-            Log.e(TAG, "Erro no upload do Appwrite: ${e.message}", e)
+            Log.e(TAG, "Erro no upload do Appwrite para bucket '$bucketId': ${e.message}", e)
             Result.failure(e)
         }
     }

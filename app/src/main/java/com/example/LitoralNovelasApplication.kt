@@ -5,6 +5,9 @@ import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class LitoralNovelasApplication : Application() {
     companion object {
@@ -32,6 +35,9 @@ class LitoralNovelasApplication : Application() {
 
         try {
             Appwrite.init(this)
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                Appwrite.ensureSession()
+            }
             Log.d("LitoralNovelasApp", "Appwrite initialized successfully")
         } catch (e: Exception) {
             Log.w("LitoralNovelasApp", "Appwrite initialization error: ${e.message}")

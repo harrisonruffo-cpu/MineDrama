@@ -27,6 +27,7 @@ class DramaRepository(context: Context) {
 
     private val dramaDao = AppDatabase.getDatabase(context).dramaDao()
     private val firestoreDataSource = FirestoreDramaDataSource()
+    private val appwriteDataSource = AppwriteDramaDataSource()
     private val storageManager = FirebaseStorageManager(context)
     private val localPublishedStore = LocalPublishedDramaStore(context)
 
@@ -68,7 +69,21 @@ class DramaRepository(context: Context) {
         val combined = mutableListOf<Drama>()
         combined.addAll(localUserDramas)
 
-        // 1. Try Firebase Firestore first
+        // 1. Try Appwrite Cloud Database
+        try {
+            val appwriteDramas = appwriteDataSource.fetchDramas()
+            if (appwriteDramas.isNotEmpty()) {
+                for (d in appwriteDramas) {
+                    if (combined.none { it.id == d.id }) {
+                        combined.add(d)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("DramaRepository", "Appwrite database fetch note: ${e.message}")
+        }
+
+        // 2. Try Firebase Firestore
         try {
             val firestoreDramas = firestoreDataSource.fetchDramasOnce()
             if (firestoreDramas.isNotEmpty()) {
@@ -84,7 +99,12 @@ class DramaRepository(context: Context) {
             Log.w("DramaRepository", "Firestore fetch returned: ${e.message}")
         }
 
-        // 2. Try REST API
+        if (combined.isNotEmpty()) {
+            cachedDramas = combined
+            return@withContext cachedDramas
+        }
+
+        // 3. Try REST API
         try {
             val response = apiService.getDramasCatalog()
             if (response.isSuccessful && !response.body().isNullOrEmpty()) {
@@ -104,7 +124,7 @@ class DramaRepository(context: Context) {
             Log.w("DramaRepository", "REST API fetch returned: ${e.message}")
         }
 
-        // 3. Fallback to curated catalog
+        // 4. Fallback to curated catalog
         val curated = getCuratedRealDramas()
         for (d in curated) {
             if (combined.none { it.id == d.id }) {
@@ -158,6 +178,13 @@ class DramaRepository(context: Context) {
         updated.add(0, drama)
         cachedDramas = updated
 
+        // Push to Appwrite Database
+        try {
+            appwriteDataSource.saveOrUpdateDrama(drama)
+        } catch (e: Exception) {
+            Log.w("DramaRepository", "Appwrite publish sync note: ${e.message}")
+        }
+
         // Push to Firestore in parallel/online
         try {
             firestoreDataSource.publishOrUpdateDrama(drama)
@@ -170,6 +197,13 @@ class DramaRepository(context: Context) {
     suspend fun deleteDrama(dramaId: String): Boolean = withContext(Dispatchers.IO) {
         localPublishedStore.deleteDrama(dramaId)
         cachedDramas = cachedDramas.filterNot { it.id == dramaId }
+
+        try {
+            appwriteDataSource.deleteDrama(dramaId)
+        } catch (e: Exception) {
+            Log.w("DramaRepository", "Appwrite delete sync note: ${e.message}")
+        }
+
         try {
             firestoreDataSource.deleteDrama(dramaId)
         } catch (e: Exception) {

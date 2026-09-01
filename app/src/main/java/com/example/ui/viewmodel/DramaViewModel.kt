@@ -483,11 +483,11 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
                  }
              }
 
-             // 3. Save remote metadata to Firestore online database
+             // 3. Save remote metadata to Appwrite and Firestore online database
              _uploadProgress.value = UploadProgressInfo(
                  isUploading = true,
                  progressPercent = 92,
-                 currentStep = "Gravando metadados no Firestore..."
+                 currentStep = "Gravando na nuvem (Appwrite / Firestore)..."
              )
 
              val ep1 = Episode(
