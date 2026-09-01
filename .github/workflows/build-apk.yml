@@ -77,33 +77,31 @@ jobs:
       - name: Organizar e Renomear APK de Saída
         run: |
           mkdir -p release-apk
-          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apk/LitoralNovelas-v1.1.0.apk \;
+          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apk/LitoralNovelas-v1.1.1.apk \;
           echo "APK gerado com sucesso:"
           ls -lh release-apk/
 
       - name: Publicar APK como Artefato do Workflow
         uses: actions/upload-artifact@v4
         with:
-          name: LitoralNovelas-v1.1.0-APK
-          path: release-apk/LitoralNovelas-v1.1.0.apk
+          name: LitoralNovelas-v1.1.1-APK
+          path: release-apk/LitoralNovelas-v1.1.1.apk
           retention-days: 30
 
       - name: Criar GitHub Release Oficial
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          files: release-apk/LitoralNovelas-v1.1.0.apk
-          name: Litoral Novelas ${{ github.ref_name || 'v1.1.0' }}
-          tag_name: ${{ github.ref_name || 'v1.1.0' }}
+          files: release-apk/LitoralNovelas-v1.1.1.apk
+          name: Litoral Novelas ${{ github.ref_name || 'v1.1.1' }}
+          tag_name: ${{ github.ref_name || 'v1.1.1' }}
           body: |
-            ## 🌊 Litoral Novelas v1.1.0 - Correção Definitiva de Inicialização
-            
-            - **Download do APK**: Baixe o arquivo `LitoralNovelas-v1.1.0.apk` abaixo e instale diretamente no seu aparelho Android.
-            - **Principais Correções e Melhorias da Versão 1.1.0**:
-              - 🚀 **Remoção de Inicializadores Conflitantes de Terceiros**: Eliminado o provedor do Firebase (que causava falhas contínuas no startup em aparelhos Xiaomi/MIUI com chaves simuladas).
-              - ⚡ **Appwrite NYC Cloud Nativo e Rápido**: Comunicação 100% direta e segura com o endpoint regional `https://nyc.cloud.appwrite.io/v1`.
-              - 🛡️ **Banco de Dados Room Blindado**: Migrações e fallbacks automáticos em memória em caso de banco corrompido de instalações anteriores.
-              - 🎬 **ExoPlayer Resiliente**: Reprodução vertical contínua com tratamento de exceções de buffer.
+            ## 🌊 Litoral Novelas v1.1.1 - Correção Definitiva de Inicialização
+
+            - **Download do APK**: Baixe o arquivo `LitoralNovelas-v1.1.1.apk` abaixo e instale diretamente no seu aparelho Android.
+            - **Correção Crucial**:
+              - 🎯 **Correção do ClassNotFoundException**: Corrigida a divergência entre o namespace e o pacote das classes Java/Kotlin (`com.example`), garantindo que o Android consiga carregar a classe de aplicação e as telas instantaneamente sem fechar.
+              - ⚡ **Appwrite NYC Cloud Nativo**: Conexão com `https://nyc.cloud.appwrite.io/v1`.
           draft: false
           prerelease: false
         env:
