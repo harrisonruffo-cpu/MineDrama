@@ -406,24 +406,37 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
                  _uploadProgress.value = UploadProgressInfo(
                      isUploading = true,
                      progressPercent = 15,
-                     currentStep = "Enviando capa para o Cloud Storage..."
+                     currentStep = "Enviando capa para a nuvem..."
                  )
-                 val coverResult = repository.getStorageManager().uploadCoverImage(
-                     uri = posterUrl.toUri(),
-                     dramaId = dramaId,
-                     onProgress = { percent, _, _ ->
-                         _uploadProgress.value = UploadProgressInfo(
-                             isUploading = true,
-                             progressPercent = 15 + (percent * 20 / 100),
-                             currentStep = "Enviando capa para o Storage ($percent%)..."
-                         )
+                 try {
+                     val appwriteCoverResult = com.example.data.remote.AppwriteStorageManager.uploadFile(
+                         context = com.example.LitoralNovelasApplication.instance,
+                         uri = posterUrl.toUri(),
+                         bucketId = com.example.data.remote.AppwriteStorageManager.BUCKET_COVERS,
+                         mimeType = "image/jpeg"
+                     )
+                     if (appwriteCoverResult.isSuccess) {
+                         finalPosterUrl = appwriteCoverResult.getOrThrow()
                      }
-                 )
-                 if (coverResult.isSuccess) {
-                     finalPosterUrl = coverResult.getOrThrow()
-                 } else {
-                     // If upload fails, notify or fallback to safe placeholder
-                     android.util.Log.w("DramaViewModel", "Cover upload error, falling back: ${coverResult.exceptionOrNull()?.message}")
+                 } catch (_: Exception) {}
+
+                 if (!finalPosterUrl.startsWith("http://") && !finalPosterUrl.startsWith("https://")) {
+                     val coverResult = repository.getStorageManager().uploadCoverImage(
+                         uri = posterUrl.toUri(),
+                         dramaId = dramaId,
+                         onProgress = { percent, _, _ ->
+                             _uploadProgress.value = UploadProgressInfo(
+                                 isUploading = true,
+                                 progressPercent = 15 + (percent * 20 / 100),
+                                 currentStep = "Enviando capa para o Storage ($percent%)..."
+                             )
+                         }
+                     )
+                     if (coverResult.isSuccess) {
+                         finalPosterUrl = coverResult.getOrThrow()
+                     } else {
+                         android.util.Log.w("DramaViewModel", "Cover upload error, falling back: ${coverResult.exceptionOrNull()?.message}")
+                     }
                  }
              }
 
@@ -435,24 +448,38 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
                      progressPercent = 35,
                      currentStep = "Iniciando upload do vídeo MP4 para a nuvem..."
                  )
-                 val videoResult = repository.getStorageManager().uploadVideo(
-                     uri = videoUrl.toUri(),
-                     dramaId = dramaId,
-                     episodeNumber = 1,
-                     onProgress = { percent, _, _ ->
-                         _uploadProgress.value = UploadProgressInfo(
-                             isUploading = true,
-                             progressPercent = 35 + (percent * 55 / 100),
-                             currentStep = "Enviando vídeo MP4 para o Storage ($percent%)..."
-                         )
+                 try {
+                     val appwriteVideoResult = com.example.data.remote.AppwriteStorageManager.uploadFile(
+                         context = com.example.LitoralNovelasApplication.instance,
+                         uri = videoUrl.toUri(),
+                         bucketId = com.example.data.remote.AppwriteStorageManager.BUCKET_VIDEOS,
+                         mimeType = "video/mp4"
+                     )
+                     if (appwriteVideoResult.isSuccess) {
+                         finalVideoUrl = appwriteVideoResult.getOrThrow()
                      }
-                 )
-                 if (videoResult.isSuccess) {
-                     finalVideoUrl = videoResult.getOrThrow()
-                 } else {
-                     val errorMsg = videoResult.exceptionOrNull()?.message ?: "Falha no upload do vídeo."
-                     android.util.Log.w("DramaViewModel", "Video storage upload warning: $errorMsg. Using direct uri as fallback.")
-                     finalVideoUrl = videoUrl
+                 } catch (_: Exception) {}
+
+                 if (!finalVideoUrl.startsWith("http://") && !finalVideoUrl.startsWith("https://")) {
+                     val videoResult = repository.getStorageManager().uploadVideo(
+                         uri = videoUrl.toUri(),
+                         dramaId = dramaId,
+                         episodeNumber = 1,
+                         onProgress = { percent, _, _ ->
+                             _uploadProgress.value = UploadProgressInfo(
+                                 isUploading = true,
+                                 progressPercent = 35 + (percent * 55 / 100),
+                                 currentStep = "Enviando vídeo MP4 para o Storage ($percent%)..."
+                             )
+                         }
+                     )
+                     if (videoResult.isSuccess) {
+                         finalVideoUrl = videoResult.getOrThrow()
+                     } else {
+                         val errorMsg = videoResult.exceptionOrNull()?.message ?: "Falha no upload do vídeo."
+                         android.util.Log.w("DramaViewModel", "Video storage upload warning: $errorMsg. Using direct uri as fallback.")
+                         finalVideoUrl = videoUrl
+                     }
                  }
              }
 
@@ -612,13 +639,40 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
             val nextEpNumber = drama.episodes.size + 1
+            var finalVideoUrl = videoUrl
+
+            if (!videoUrl.startsWith("http://") && !videoUrl.startsWith("https://")) {
+                try {
+                    val appwriteVideoResult = com.example.data.remote.AppwriteStorageManager.uploadFile(
+                        context = com.example.LitoralNovelasApplication.instance,
+                        uri = videoUrl.toUri(),
+                        bucketId = com.example.data.remote.AppwriteStorageManager.BUCKET_VIDEOS,
+                        mimeType = "video/mp4"
+                    )
+                    if (appwriteVideoResult.isSuccess) {
+                        finalVideoUrl = appwriteVideoResult.getOrThrow()
+                    }
+                } catch (_: Exception) {}
+
+                if (!finalVideoUrl.startsWith("http://") && !finalVideoUrl.startsWith("https://")) {
+                    val videoResult = repository.getStorageManager().uploadVideo(
+                        uri = videoUrl.toUri(),
+                        dramaId = dramaId,
+                        episodeNumber = nextEpNumber
+                    )
+                    if (videoResult.isSuccess) {
+                        finalVideoUrl = videoResult.getOrThrow()
+                    }
+                }
+            }
+
             val newEpisode = Episode(
                 id = "${dramaId}_ep_$nextEpNumber",
                 dramaId = dramaId,
                 episodeNumber = nextEpNumber,
                 title = episodeTitle.ifBlank { "Episódio $nextEpNumber" },
                 durationSeconds = durationSeconds,
-                videoUrl = videoUrl,
+                videoUrl = VideoUrlResolver.resolveDirectVideoUrl(finalVideoUrl),
                 thumbnailUrl = drama.posterUrl,
                 synopsis = "Novo episódio de ${drama.title}",
                 isFree = true,

@@ -7,8 +7,14 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 
 class LitoralNovelasApplication : Application() {
+    companion object {
+        lateinit var instance: LitoralNovelasApplication
+            private set
+    }
+
     override fun onCreate() {
         super.onCreate()
+        instance = this
         try {
             if (FirebaseApp.getApps(this).isEmpty()) {
                 FirebaseApp.initializeApp(this)

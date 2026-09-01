@@ -8,8 +8,8 @@ import io.appwrite.services.Account
 import io.appwrite.services.Storage
 
 object Appwrite {
-    private const val ENDPOINT = "https://cloud.appwrite.io/v1"
-    private const val PROJECT_ID = "6a956ae100291007e582"
+    const val ENDPOINT = "https://cloud.appwrite.io/v1"
+    const val PROJECT_ID = "6a956ae100291007e582"
 
     lateinit var client: Client
     lateinit var account: Account

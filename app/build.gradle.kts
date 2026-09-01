@@ -17,8 +17,8 @@ android {
     applicationId = "com.aistudio.minidrama.vjklmq"
     minSdk = 24
     targetSdk = 36
-    versionCode = 6
-    versionName = "1.0.5"
+    versionCode = 7
+    versionName = "1.0.6"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -76,8 +76,7 @@ googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.W
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
-implementation("io.appwrite:sdk-for-android:8.1.0")
-implementation("io.appwrite:sdk-for-android:8.1.0")
+  implementation("io.appwrite:sdk-for-android:8.1.0")
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
