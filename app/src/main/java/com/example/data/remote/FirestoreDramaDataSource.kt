@@ -12,11 +12,18 @@ import kotlinx.coroutines.withContext
 
 class FirestoreDramaDataSource {
     private val TAG = "FirestoreDramaDS"
-    private val firestore by lazy { FirebaseFirestore.getInstance() }
+    private val firestore: FirebaseFirestore?
+        get() = try {
+            FirebaseFirestore.getInstance()
+        } catch (e: Throwable) {
+            Log.w(TAG, "Firebase Firestore indisponível: ${e.message}")
+            null
+        }
 
     suspend fun getDramas(): List<Drama> = withContext(Dispatchers.IO) {
         try {
-            val snapshot = firestore.collection("dramas")
+            val db = firestore ?: return@withContext emptyList()
+            val snapshot = db.collection("dramas")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .limit(50)
                 .get()
@@ -77,6 +84,7 @@ class FirestoreDramaDataSource {
 
     suspend fun saveDrama(drama: Drama): Boolean = withContext(Dispatchers.IO) {
         try {
+            val db = firestore ?: return@withContext false
             val episodesMap = drama.episodes.map { ep ->
                 mapOf(
                     "id" to ep.id,
@@ -106,13 +114,13 @@ class FirestoreDramaDataSource {
                 "episodes" to episodesMap
             )
 
-            firestore.collection("dramas")
+            db.collection("dramas")
                 .document(drama.id)
                 .set(docData, SetOptions.merge())
                 .await()
 
             true
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Falha ao salvar no Firestore: ${e.message}")
             false
         }

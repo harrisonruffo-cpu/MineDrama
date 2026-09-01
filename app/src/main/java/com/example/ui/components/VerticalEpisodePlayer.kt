@@ -62,28 +62,42 @@ fun VerticalEpisodePlayer(
     }
 
     val exoPlayer = remember(videoSource) {
-        ExoPlayer.Builder(context).build().apply {
-            val mediaItem = MediaItem.fromUri(Uri.parse(videoSource))
-            setMediaItem(mediaItem)
-            repeatMode = Player.REPEAT_MODE_ONE
-            prepare()
-            playWhenReady = isPlaying
-            addListener(object : Player.Listener {
-                override fun onPlaybackStateChanged(state: Int) {
-                    isVideoBuffering = state == Player.STATE_BUFFERING
+        try {
+            ExoPlayer.Builder(context).build().apply {
+                if (videoSource.isNotBlank()) {
+                    val mediaItem = MediaItem.fromUri(Uri.parse(videoSource))
+                    setMediaItem(mediaItem)
+                    repeatMode = Player.REPEAT_MODE_ONE
+                    prepare()
+                    playWhenReady = isPlaying
                 }
-            })
+                addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(state: Int) {
+                        isVideoBuffering = state == Player.STATE_BUFFERING
+                    }
+
+                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                        isVideoBuffering = false
+                    }
+                })
+            }
+        } catch (e: Throwable) {
+            null
         }
     }
 
-    DisposableEffect(videoSource) {
+    DisposableEffect(exoPlayer) {
         onDispose {
-            exoPlayer.release()
+            try {
+                exoPlayer?.release()
+            } catch (_: Throwable) {}
         }
     }
 
-    LaunchedEffect(isPlaying) {
-        exoPlayer.playWhenReady = isPlaying && !isPlayerPaused
+    LaunchedEffect(isPlaying, exoPlayer) {
+        try {
+            exoPlayer?.playWhenReady = isPlaying && !isPlayerPaused
+        } catch (_: Throwable) {}
     }
 
     Box(
@@ -100,7 +114,7 @@ fun VerticalEpisodePlayer(
                     },
                     onTap = {
                         isPlayerPaused = !isPlayerPaused
-                        exoPlayer.playWhenReady = !isPlayerPaused
+                        exoPlayer?.playWhenReady = !isPlayerPaused
                     }
                 )
             }
@@ -116,6 +130,9 @@ fun VerticalEpisodePlayer(
                         android.view.ViewGroup.LayoutParams.MATCH_PARENT
                     )
                 }
+            },
+            update = { playerView ->
+                playerView.player = exoPlayer
             },
             modifier = Modifier.fillMaxSize()
         )

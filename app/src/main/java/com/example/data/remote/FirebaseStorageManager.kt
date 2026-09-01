@@ -10,17 +10,24 @@ import java.util.UUID
 
 class FirebaseStorageManager {
     private val TAG = "FirebaseStorageManager"
-    private val storage by lazy { FirebaseStorage.getInstance() }
+    private val storage: FirebaseStorage?
+        get() = try {
+            FirebaseStorage.getInstance()
+        } catch (e: Throwable) {
+            Log.w(TAG, "Firebase Storage indisponível: ${e.message}")
+            null
+        }
 
     suspend fun uploadVideo(uri: Uri, dramaId: String, episodeNumber: Int): String? = withContext(Dispatchers.IO) {
         try {
+            val fbStorage = storage ?: return@withContext null
             val fileName = "dramas/$dramaId/episodes/ep_${episodeNumber}_${UUID.randomUUID()}.mp4"
-            val ref = storage.reference.child(fileName)
+            val ref = fbStorage.reference.child(fileName)
             ref.putFile(uri).await()
             val downloadUrl = ref.downloadUrl.await().toString()
             Log.d(TAG, "Upload Firebase Storage concluído: $downloadUrl")
             downloadUrl
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Falha upload Firebase Storage: ${e.message}")
             null
         }
@@ -28,12 +35,13 @@ class FirebaseStorageManager {
 
     suspend fun uploadCover(uri: Uri, dramaId: String): String? = withContext(Dispatchers.IO) {
         try {
+            val fbStorage = storage ?: return@withContext null
             val fileName = "dramas/$dramaId/cover_${UUID.randomUUID()}.jpg"
-            val ref = storage.reference.child(fileName)
+            val ref = fbStorage.reference.child(fileName)
             ref.putFile(uri).await()
             val downloadUrl = ref.downloadUrl.await().toString()
             downloadUrl
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Falha upload capa Firebase Storage: ${e.message}")
             null
         }

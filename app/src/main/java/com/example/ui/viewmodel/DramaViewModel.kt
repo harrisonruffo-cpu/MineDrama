@@ -77,8 +77,17 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun observeFavorites() {
         viewModelScope.launch {
-            db.dramaDao().getFavoriteIdsFlow().collect { ids ->
-                _favoriteDramaIds.value = ids.toSet()
+            try {
+                db.dramaDao().getFavoriteIdsFlow()
+                    .catch { e ->
+                        android.util.Log.e("DramaViewModel", "Erro ao observar favoritos: ${e.message}")
+                        emit(emptyList())
+                    }
+                    .collect { ids ->
+                        _favoriteDramaIds.value = ids.toSet()
+                    }
+            } catch (e: Throwable) {
+                android.util.Log.e("DramaViewModel", "Erro de inicialização Room favoritos: ${e.message}")
             }
         }
     }
@@ -107,24 +116,32 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleFavorite(dramaId: String) {
         viewModelScope.launch {
-            val isFav = _favoriteDramaIds.value.contains(dramaId)
-            if (isFav) {
-                db.dramaDao().removeFavorite(dramaId)
-            } else {
-                db.dramaDao().addFavorite(FavoriteEntity(dramaId))
+            try {
+                val isFav = _favoriteDramaIds.value.contains(dramaId)
+                if (isFav) {
+                    db.dramaDao().removeFavorite(dramaId)
+                } else {
+                    db.dramaDao().addFavorite(FavoriteEntity(dramaId))
+                }
+            } catch (e: Throwable) {
+                android.util.Log.e("DramaViewModel", "Erro ao alternar favorito: ${e.message}")
             }
         }
     }
 
     private fun saveWatchHistory(dramaId: String, episodeNumber: Int) {
         viewModelScope.launch {
-            db.dramaDao().updateHistory(
-                HistoryEntity(
-                    dramaId = dramaId,
-                    lastEpisodeNumber = episodeNumber + 1,
-                    lastPositionMs = 0L
+            try {
+                db.dramaDao().updateHistory(
+                    HistoryEntity(
+                        dramaId = dramaId,
+                        lastEpisodeNumber = episodeNumber + 1,
+                        lastPositionMs = 0L
+                    )
                 )
-            )
+            } catch (e: Throwable) {
+                android.util.Log.e("DramaViewModel", "Erro ao salvar histórico: ${e.message}")
+            }
         }
     }
 

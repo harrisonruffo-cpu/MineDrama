@@ -77,32 +77,33 @@ jobs:
       - name: Organizar e Renomear APK de Saída
         run: |
           mkdir -p release-apk
-          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apk/LitoralNovelas-v1.0.8.apk \;
+          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apk/LitoralNovelas-v1.0.9.apk \;
           echo "APK gerado com sucesso:"
           ls -lh release-apk/
 
       - name: Publicar APK como Artefato do Workflow
         uses: actions/upload-artifact@v4
         with:
-          name: LitoralNovelas-v1.0.8-APK
-          path: release-apk/LitoralNovelas-v1.0.8.apk
+          name: LitoralNovelas-v1.0.9-APK
+          path: release-apk/LitoralNovelas-v1.0.9.apk
           retention-days: 30
 
       - name: Criar GitHub Release Oficial
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          files: release-apk/LitoralNovelas-v1.0.8.apk
-          name: Litoral Novelas ${{ github.ref_name || 'v1.0.8' }}
-          tag_name: ${{ github.ref_name || 'v1.0.8' }}
+          files: release-apk/LitoralNovelas-v1.0.9.apk
+          name: Litoral Novelas ${{ github.ref_name || 'v1.0.9' }}
+          tag_name: ${{ github.ref_name || 'v1.0.9' }}
           body: |
-            ## 🌊 Litoral Novelas v1.0.8 - APK Oficial com Suporte NYC Appwrite Cloud
+            ## 🌊 Litoral Novelas v1.0.9 - Correção de Inicialização e Estabilidade
             
-            - **Download do APK**: Baixe o arquivo `LitoralNovelas-v1.0.8.apk` abaixo e instale diretamente no seu aparelho Android.
-            - **Novidades da Versão 1.0.8**:
-              - 🌐 **Endpoint Regional Conectado**: Atualizado para `https://nyc.cloud.appwrite.io/v1`.
-              - 🔬 **Diagnóstico da Nuvem em Tempo Real**: Painel para testar conexão com Appwrite (Auth, Database, Buckets de Vídeo/Capa) e Firebase em 1 toque.
-              - ☁️ **Sincronização Ativa**: Sincronização multi-cloud resiliente entre Appwrite e Firebase.
+            - **Download do APK**: Baixe o arquivo `LitoralNovelas-v1.0.9.apk` abaixo e instale diretamente no seu aparelho Android.
+            - **Melhorias e Correções da Versão 1.0.9**:
+              - 🛡️ **Proteção contra Falhas de Inicialização**: Tratamento resiliente do banco Room (migração automática v3), prevenindo conflitos de dados em atualizações de APK.
+              - 🛡️ **Player ExoPlayer Blindado**: Inicialização segura com proteção contra exceções e erro de reprodução de vídeo.
+              - 🛡️ **Firebase & Appwrite Tolerantes a Falhas**: Tratamento seguro sem interrupção caso a conexão de rede oscile.
+              - 🌐 **Endpoint NYC Cloud Ativo**: `https://nyc.cloud.appwrite.io/v1`.
           draft: false
           prerelease: false
         env:
