@@ -1,62 +1,80 @@
-
 package com.example
 
 import android.content.Context
 import android.util.Log
 import io.appwrite.Client
-import io.appwrite.ID
 import io.appwrite.services.Account
 import io.appwrite.services.Databases
 import io.appwrite.services.Storage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 object Appwrite {
-    const val ENDPOINT = "https://cloud.appwrite.io/v1"
+    private const val TAG = "AppwriteManager"
+
+    // Região selecionada pelo usuário: NYC Cloud
+    const val ENDPOINT = "https://nyc.cloud.appwrite.io/v1"
     const val PROJECT_ID = "6a956ae100291007e582"
 
-    // Default IDs for Appwrite Cloud Database & Storage
-    var DATABASE_ID = "litoral_novelas"
-    var COLLECTION_DRAMAS = "dramas"
-    var BUCKET_VIDEOS = "videos"
-    var BUCKET_COVERS = "covers"
+    // Database e Coleções
+    const val DATABASE_ID = "litoral_novelas"
+    const val COLLECTION_DRAMAS = "dramas"
+    const val COLLECTION_EPISODES = "episodes"
 
-    lateinit var client: Client
+    // Buckets de Storage
+    const val BUCKET_VIDEOS = "videos"
+    const val BUCKET_COVERS = "covers"
+
+    private lateinit var client: Client
     lateinit var account: Account
-    lateinit var storage: Storage
     lateinit var databases: Databases
+    lateinit var storage: Storage
 
     var isInitialized = false
         private set
 
     fun init(context: Context) {
+        if (isInitialized) return
         try {
-            client = Client(context)
+            client = Client(context.applicationContext)
                 .setEndpoint(ENDPOINT)
                 .setProject(PROJECT_ID)
 
             account = Account(client)
-            storage = Storage(client)
             databases = Databases(client)
+            storage = Storage(client)
             isInitialized = true
+            Log.d(TAG, "Appwrite inicializado com sucesso no endpoint $ENDPOINT (Project: $PROJECT_ID)")
         } catch (e: Exception) {
-            Log.e("Appwrite", "Failed to initialize Appwrite: ${e.message}", e)
+            Log.e(TAG, "Erro ao inicializar Appwrite: ${e.message}", e)
         }
     }
 
-    suspend fun ensureSession(): Boolean {
-        if (!isInitialized) return false
-        return try {
-            account.get()
+    suspend fun ensureSession(): Boolean = withContext(Dispatchers.IO) {
+        if (!isInitialized) return@withContext false
+        try {
+            try {
+                val current = account.get()
+                Log.d(TAG, "Sessão ativa existente: ${current.id}")
+                return@withContext true
+            } catch (_: Exception) {
+                // Tenta criar sessão anônima
+            }
+            val session = account.createAnonymousSession()
+            Log.d(TAG, "Nova sessão anônima criada: ${session.id}")
             true
         } catch (e: Exception) {
-            try {
-                account.createAnonymousSession()
-                Log.d("Appwrite", "Anonymous session created successfully")
-                true
-            } catch (e2: Exception) {
-                Log.w("Appwrite", "Could not create anonymous session: ${e2.message}")
-                false
-            }
+            Log.w(TAG, "Não foi possível criar sessão anônima: ${e.message}")
+            // Mesmo se a criação de sessão anônima falhar por já ter sessão ou modo guest, continua
+            true
         }
     }
-}
 
+    fun getFileViewUrl(bucketId: String, fileId: String): String {
+        return "$ENDPOINT/storage/buckets/$bucketId/files/$fileId/view?project=$PROJECT_ID"
+    }
+
+    fun getFileDownloadUrl(bucketId: String, fileId: String): String {
+        return "$ENDPOINT/storage/buckets/$bucketId/files/$fileId/download?project=$PROJECT_ID"
+    }
+}

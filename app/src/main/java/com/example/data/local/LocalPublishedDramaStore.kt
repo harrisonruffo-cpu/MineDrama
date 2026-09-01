@@ -2,117 +2,118 @@ package com.example.data.local
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
 import com.example.data.model.Drama
 import com.example.data.model.Episode
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.Types
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
+import org.json.JSONObject
 
 class LocalPublishedDramaStore(context: Context) {
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("litoral_published_store", Context.MODE_PRIVATE)
 
-    private val prefs: SharedPreferences = context.getSharedPreferences("mine_drama_published_store", Context.MODE_PRIVATE)
-    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
-    private val listType = Types.newParameterizedType(List::class.java, Drama::class.java)
-    private val adapter = moshi.adapter<List<Drama>>(listType)
-
-    private val _publishedDramas = MutableStateFlow<List<Drama>>(emptyList())
-    val publishedDramas: StateFlow<List<Drama>> = _publishedDramas.asStateFlow()
-
-    init {
-        loadPublishedDramas()
-    }
-
-    private fun loadPublishedDramas() {
-        val json = prefs.getString("published_dramas_json", null)
-        if (!json.isNullOrBlank()) {
-            try {
-                val list = adapter.fromJson(json) ?: emptyList()
-                _publishedDramas.value = list
-            } catch (e: Exception) {
-                Log.e("LocalPublishedDramaStore", "Error loading local published dramas", e)
-            }
-        }
-    }
-
-    @Synchronized
-    private fun saveListToPrefs(list: List<Drama>) {
-        try {
-            val json = adapter.toJson(list)
-            prefs.edit().putString("published_dramas_json", json).apply()
-            _publishedDramas.value = list
-        } catch (e: Exception) {
-            Log.e("LocalPublishedDramaStore", "Error saving local published dramas", e)
-        }
-    }
-
-    fun getAllPublishedDramas(): List<Drama> {
-        return _publishedDramas.value
-    }
-
-    fun saveOrUpdateDrama(drama: Drama) {
-        val current = _publishedDramas.value.toMutableList()
-        val index = current.indexOfFirst { it.id == drama.id }
+    fun saveDrama(drama: Drama) {
+        val list = getSavedDramas().toMutableList()
+        val index = list.indexOfFirst { it.id == drama.id }
         if (index >= 0) {
-            current[index] = drama
+            list[index] = drama
         } else {
-            current.add(0, drama)
+            list.add(0, drama)
         }
-        saveListToPrefs(current)
+        persistDramas(list)
     }
 
-    fun renameDrama(dramaId: String, newTitle: String): Boolean {
-        val current = _publishedDramas.value.toMutableList()
-        val index = current.indexOfFirst { it.id == dramaId }
-        if (index >= 0) {
-            current[index] = current[index].copy(title = newTitle)
-            saveListToPrefs(current)
-            return true
-        }
-        return false
-    }
+    fun getSavedDramas(): List<Drama> {
+        val raw = prefs.getString("published_dramas_json", null) ?: return emptyList()
+        return try {
+            val arr = JSONArray(raw)
+            val list = mutableListOf<Drama>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val epsArr = obj.optJSONArray("episodes") ?: JSONArray()
+                val episodes = mutableListOf<Episode>()
+                for (j in 0 until epsArr.length()) {
+                    val epObj = epsArr.getJSONObject(j)
+                    episodes.add(
+                        Episode(
+                            id = epObj.optString("id", "ep_$j"),
+                            dramaId = epObj.optString("dramaId", obj.optString("id")),
+                            episodeNumber = epObj.optInt("episodeNumber", j + 1),
+                            title = epObj.optString("title", "Episódio ${j + 1}"),
+                            videoUrl = epObj.optString("videoUrl"),
+                            durationSeconds = epObj.optInt("durationSeconds", 90),
+                            isFree = epObj.optBoolean("isFree", true),
+                            thumbnail = epObj.optString("thumbnail"),
+                            localUri = epObj.optString("localUri").takeIf { it.isNotBlank() }
+                        )
+                    )
+                }
 
-    fun renameEpisode(dramaId: String, episodeId: String, newTitle: String): Boolean {
-        val current = _publishedDramas.value.toMutableList()
-        val index = current.indexOfFirst { it.id == dramaId }
-        if (index >= 0) {
-            val drama = current[index]
-            val updatedEpisodes = drama.episodes.map { ep ->
-                if (ep.id == episodeId) ep.copy(title = newTitle) else ep
+                list.add(
+                    Drama(
+                        id = obj.optString("id"),
+                        title = obj.optString("title"),
+                        description = obj.optString("description"),
+                        coverUrl = obj.optString("coverUrl"),
+                        bannerUrl = obj.optString("bannerUrl"),
+                        genre = obj.optString("genre", "Romance"),
+                        totalEpisodes = obj.optInt("totalEpisodes", episodes.size.coerceAtLeast(1)),
+                        rating = obj.optDouble("rating", 4.9),
+                        viewsCount = obj.optLong("viewsCount", 1000L),
+                        likesCount = obj.optLong("likesCount", 250L),
+                        isTrending = obj.optBoolean("isTrending", false),
+                        isFeatured = obj.optBoolean("isFeatured", false),
+                        episodes = episodes,
+                        isPublishedLocally = true,
+                        createdAt = obj.optLong("createdAt", System.currentTimeMillis())
+                    )
+                )
             }
-            current[index] = drama.copy(episodes = updatedEpisodes)
-            saveListToPrefs(current)
-            return true
+            list
+        } catch (e: Exception) {
+            emptyList()
         }
-        return false
     }
 
-    fun deleteDrama(dramaId: String): Boolean {
-        val current = _publishedDramas.value.toMutableList()
-        val removed = current.removeAll { it.id == dramaId }
-        if (removed) {
-            saveListToPrefs(current)
-            return true
-        }
-        return false
+    fun deleteDrama(dramaId: String) {
+        val list = getSavedDramas().filterNot { it.id == dramaId }
+        persistDramas(list)
     }
 
-    fun addEpisode(dramaId: String, episode: Episode): Boolean {
-        val current = _publishedDramas.value.toMutableList()
-        val index = current.indexOfFirst { it.id == dramaId }
-        if (index >= 0) {
-            val drama = current[index]
-            val updatedEpisodes = drama.episodes.toMutableList().apply { add(episode) }
-            current[index] = drama.copy(
-                episodes = updatedEpisodes,
-                totalEpisodes = updatedEpisodes.size
-            )
-            saveListToPrefs(current)
-            return true
+    private fun persistDramas(list: List<Drama>) {
+        val arr = JSONArray()
+        for (d in list) {
+            val obj = JSONObject()
+            obj.put("id", d.id)
+            obj.put("title", d.title)
+            obj.put("description", d.description)
+            obj.put("coverUrl", d.coverUrl)
+            obj.put("bannerUrl", d.bannerUrl)
+            obj.put("genre", d.genre)
+            obj.put("totalEpisodes", d.totalEpisodes)
+            obj.put("rating", d.rating)
+            obj.put("viewsCount", d.viewsCount)
+            obj.put("likesCount", d.likesCount)
+            obj.put("isTrending", d.isTrending)
+            obj.put("isFeatured", d.isFeatured)
+            obj.put("createdAt", d.createdAt)
+
+            val epsArr = JSONArray()
+            for (ep in d.episodes) {
+                val epObj = JSONObject()
+                epObj.put("id", ep.id)
+                epObj.put("dramaId", ep.dramaId)
+                epObj.put("episodeNumber", ep.episodeNumber)
+                epObj.put("title", ep.title)
+                epObj.put("videoUrl", ep.videoUrl)
+                epObj.put("durationSeconds", ep.durationSeconds)
+                epObj.put("isFree", ep.isFree)
+                epObj.put("thumbnail", ep.thumbnail)
+                epObj.put("localUri", ep.localUri ?: "")
+                epsArr.put(epObj)
+            }
+            obj.put("episodes", epsArr)
+            arr.put(obj)
         }
-        return false
+        prefs.edit().putString("published_dramas_json", arr.toString()).apply()
     }
 }

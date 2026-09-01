@@ -11,56 +11,76 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
-object AppwriteStorageManager {
-    private const val TAG = "AppwriteStorage"
+class AppwriteStorageManager(private val context: Context) {
+    private val TAG = "AppwriteStorage"
 
-    // Substitua pelo ID do Bucket criado no Console do Appwrite
-    var BUCKET_VIDEOS = "videos"
-    var BUCKET_COVERS = "covers"
-
-    /**
-     * Faz upload de um arquivo para o Storage do Appwrite e retorna o link direto de visualização/streaming.
-     */
-    suspend fun uploadFile(
-        context: Context,
+    suspend fun uploadVideo(
         uri: Uri,
-        bucketId: String,
-        mimeType: String = "video/mp4"
-    ): Result<String> = withContext(Dispatchers.IO) {
+        fileName: String,
+        onProgress: (Float) -> Unit = {}
+    ): String? = withContext(Dispatchers.IO) {
         try {
             if (!Appwrite.isInitialized) {
                 Appwrite.init(context)
             }
             Appwrite.ensureSession()
 
-            val contentResolver = context.contentResolver
-            val tempFile = File(context.cacheDir, "appwrite_upload_${System.currentTimeMillis()}")
-            
-            contentResolver.openInputStream(uri)?.use { input ->
-                FileOutputStream(tempFile).use { output ->
-                    input.copyTo(output)
-                }
-            } ?: return@withContext Result.failure(Exception("Não foi possível ler o arquivo selecionado"))
-
+            val tempFile = createTempFileFromUri(uri, "upload_video_$fileName")
             val inputFile = InputFile.fromFile(tempFile)
-            val fileId = ID.unique()
 
-            // Executa o upload para o Bucket Appwrite
-            val response = Appwrite.storage.createFile(
-                bucketId = bucketId,
-                fileId = fileId,
+            val fileResult = Appwrite.storage.createFile(
+                bucketId = Appwrite.BUCKET_VIDEOS,
+                fileId = ID.unique(),
                 file = inputFile
             )
 
-            // Constrói URL direta pública de visualização/stream
-            val fileUrl = "https://cloud.appwrite.io/v1/storage/buckets/$bucketId/files/${response.id}/view?project=${Appwrite.PROJECT_ID}"
-            Log.d(TAG, "Upload concluído com sucesso no Appwrite: $fileUrl")
-            
+            val directUrl = Appwrite.getFileViewUrl(Appwrite.BUCKET_VIDEOS, fileResult.id)
+            Log.d(TAG, "Upload de vídeo com sucesso no Appwrite: $directUrl")
             tempFile.delete()
-            Result.success(fileUrl)
+            directUrl
         } catch (e: Exception) {
-            Log.e(TAG, "Erro no upload do Appwrite para bucket '$bucketId': ${e.message}", e)
-            Result.failure(e)
+            Log.e(TAG, "Falha no upload do vídeo para o Appwrite: ${e.message}", e)
+            null
         }
+    }
+
+    suspend fun uploadCover(
+        uri: Uri,
+        fileName: String
+    ): String? = withContext(Dispatchers.IO) {
+        try {
+            if (!Appwrite.isInitialized) {
+                Appwrite.init(context)
+            }
+            Appwrite.ensureSession()
+
+            val tempFile = createTempFileFromUri(uri, "upload_cover_$fileName")
+            val inputFile = InputFile.fromFile(tempFile)
+
+            val fileResult = Appwrite.storage.createFile(
+                bucketId = Appwrite.BUCKET_COVERS,
+                fileId = ID.unique(),
+                file = inputFile
+            )
+
+            val directUrl = Appwrite.getFileViewUrl(Appwrite.BUCKET_COVERS, fileResult.id)
+            Log.d(TAG, "Upload de capa com sucesso no Appwrite: $directUrl")
+            tempFile.delete()
+            directUrl
+        } catch (e: Exception) {
+            Log.e(TAG, "Falha no upload da capa para o Appwrite: ${e.message}", e)
+            null
+        }
+    }
+
+    private fun createTempFileFromUri(uri: Uri, prefix: String): File {
+        val extension = if (uri.toString().contains(".mp4", ignoreCase = true)) ".mp4" else ".tmp"
+        val tempFile = File.createTempFile(prefix, extension, context.cacheDir)
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            FileOutputStream(tempFile).use { output ->
+                input.copyTo(output)
+            }
+        }
+        return tempFile
     }
 }

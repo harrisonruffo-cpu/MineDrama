@@ -1,73 +1,57 @@
 package com.example.data.local
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
+import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface DramaDao {
-    // Watch History
-    @Query("SELECT * FROM watch_history ORDER BY updatedAt DESC")
-    fun getAllWatchHistory(): Flow<List<WatchHistoryEntity>>
+    @Query("SELECT * FROM dramas ORDER BY createdAt DESC")
+    fun getAllDramasFlow(): Flow<List<DramaEntity>>
 
-    @Query("SELECT * FROM watch_history WHERE dramaId = :dramaId LIMIT 1")
-    suspend fun getWatchHistory(dramaId: String): WatchHistoryEntity?
+    @Query("SELECT * FROM dramas WHERE id = :dramaId LIMIT 1")
+    suspend fun getDramaById(dramaId: String): DramaEntity?
+
+    @Query("SELECT * FROM episodes WHERE dramaId = :dramaId ORDER BY episodeNumber ASC")
+    fun getEpisodesForDramaFlow(dramaId: String): Flow<List<EpisodeEntity>>
+
+    @Query("SELECT * FROM episodes WHERE dramaId = :dramaId ORDER BY episodeNumber ASC")
+    suspend fun getEpisodesForDrama(dramaId: String): List<EpisodeEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertWatchHistory(history: WatchHistoryEntity)
+    suspend fun insertDrama(drama: DramaEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAllWatchHistory(historyList: List<WatchHistoryEntity>)
+    suspend fun insertDramas(dramas: List<DramaEntity>)
 
-    @Query("SELECT * FROM watch_history ORDER BY updatedAt DESC")
-    suspend fun getAllWatchHistoryList(): List<WatchHistoryEntity>
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEpisode(episode: EpisodeEntity)
 
-    @Query("DELETE FROM watch_history WHERE dramaId = :dramaId")
-    suspend fun deleteWatchHistory(dramaId: String)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEpisodes(episodes: List<EpisodeEntity>)
 
-    @Query("DELETE FROM watch_history")
-    suspend fun clearWatchHistory()
+    @Query("DELETE FROM dramas WHERE id = :dramaId")
+    suspend fun deleteDrama(dramaId: String)
+
+    @Query("DELETE FROM episodes WHERE dramaId = :dramaId")
+    suspend fun deleteEpisodesForDrama(dramaId: String)
 
     // Favorites
-    @Query("SELECT * FROM favorites ORDER BY addedAt DESC")
-    fun getAllFavorites(): Flow<List<FavoriteEntity>>
+    @Query("SELECT dramaId FROM user_favorites ORDER BY addedAt DESC")
+    fun getFavoriteIdsFlow(): Flow<List<String>>
 
-    @Query("SELECT * FROM favorites ORDER BY addedAt DESC")
-    suspend fun getAllFavoritesList(): List<FavoriteEntity>
-
-    @Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE dramaId = :dramaId)")
-    fun isFavoriteFlow(dramaId: String): Flow<Boolean>
-
-    @Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE dramaId = :dramaId)")
+    @Query("SELECT EXISTS(SELECT 1 FROM user_favorites WHERE dramaId = :dramaId)")
     suspend fun isFavorite(dramaId: String): Boolean
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertFavorite(favorite: FavoriteEntity)
+    suspend fun addFavorite(favorite: FavoriteEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAllFavorites(favoritesList: List<FavoriteEntity>)
-
-    @Query("DELETE FROM favorites WHERE dramaId = :dramaId")
+    @Query("DELETE FROM user_favorites WHERE dramaId = :dramaId")
     suspend fun removeFavorite(dramaId: String)
 
-    // Liked Episodes
-    @Query("SELECT compositeKey FROM liked_episodes")
-    fun getAllLikedKeys(): Flow<List<String>>
-
-    @Query("SELECT compositeKey FROM liked_episodes")
-    suspend fun getAllLikedKeysList(): List<String>
-
-    @Query("SELECT EXISTS(SELECT 1 FROM liked_episodes WHERE dramaId = :dramaId AND episodeNumber = :episodeNumber)")
-    fun isEpisodeLikedFlow(dramaId: String, episodeNumber: Int): Flow<Boolean>
+    // History
+    @Query("SELECT * FROM watch_history ORDER BY updatedAt DESC")
+    fun getWatchHistoryFlow(): Flow<List<HistoryEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertLikedEpisode(liked: LikedEpisodeEntity)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAllLikedEpisodes(likedList: List<LikedEpisodeEntity>)
-
-    @Query("DELETE FROM liked_episodes WHERE dramaId = :dramaId AND episodeNumber = :episodeNumber")
-    suspend fun removeLikedEpisode(dramaId: String, episodeNumber: Int)
+    suspend fun updateHistory(history: HistoryEntity)
 }

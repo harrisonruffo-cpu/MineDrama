@@ -1,236 +1,207 @@
 package com.example.ui.screens
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.VideoLibrary
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.model.Drama
-import com.example.data.model.DramaCategory
-import com.example.data.util.VideoUrlResolver
-import com.example.ui.theme.DarkBackground
-import com.example.ui.theme.DarkSurface
-import com.example.ui.theme.DarkSurfaceElevated
-import com.example.ui.theme.DarkSurfaceHighlight
-import com.example.ui.theme.DramaCrimson
-import com.example.ui.theme.DramaCrimsonBright
-import com.example.ui.theme.DramaGold
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
-import com.example.ui.theme.TextTertiary
+import com.example.data.model.Episode
+import com.example.ui.theme.*
 import com.example.ui.viewmodel.DramaViewModel
-import kotlinx.coroutines.launch
+import com.example.ui.viewmodel.VideoUploadViewModel
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PublishDramaScreen(
     viewModel: DramaViewModel,
-    onNavigateToFeed: () -> Unit,
+    uploadViewModel: VideoUploadViewModel,
     modifier: Modifier = Modifier
 ) {
-    val coroutineScope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
-    val focusManager = LocalFocusManager.current
-
-    val currentUser by viewModel.currentUser.collectAsState()
-    val isPublishing by viewModel.isPublishing.collectAsState()
+    val context = LocalContext.current
     val allDramas by viewModel.allDramas.collectAsState()
-
-    val uploadProgress by viewModel.uploadProgress.collectAsState()
+    val isPublishing by viewModel.isPublishing.collectAsState()
     val diagnosticResult by viewModel.diagnosticResult.collectAsState()
     val isRunningDiagnostic by viewModel.isRunningDiagnostic.collectAsState()
+    val isUploading by uploadViewModel.isUploading.collectAsState()
+    val uploadStatusMessage by uploadViewModel.uploadStatusMessage.collectAsState()
 
-    var selectedModeTab by remember { mutableIntStateOf(0) } // 0: Novo Drama, 1: Meus Vídeos / Renomear
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Novo Drama, 1: Meus Vídeos / Renomear
     var showDiagnosticDialog by remember { mutableStateOf(false) }
 
-    // Form state
-    var dramaTitle by remember { mutableStateOf("") }
-    var originalTitle by remember { mutableStateOf("") }
-    var synopsis by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf(DramaCategory.ROMANCE_CEO) }
-    var posterUrl by remember { mutableStateOf("https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80") }
-    var episodeTitle by remember { mutableStateOf("Episódio 1 - A Chegada") }
-    var videoUrl by remember { mutableStateOf("https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4") }
-    var videoSourceType by remember { mutableIntStateOf(0) } // 0: Link Direto / Web, 1: Galeria Local, 2: Presets
-    var directLinkInput by remember { mutableStateOf("") }
-    var durationSeconds by remember { mutableStateOf("90") }
+    // Form states
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var genre by remember { mutableStateOf("Romance") }
+    var coverUrl by remember { mutableStateOf("") }
+    val episodeList = remember { mutableStateListOf<Episode>() }
 
-    // Dialog state for renaming
+    // Dialog rename states
     var dramaToRename by remember { mutableStateOf<Drama?>(null) }
-    var newDramaNameInput by remember { mutableStateOf("") }
-    var episodeToRename by remember { mutableStateOf<Pair<Drama, com.example.data.model.Episode>?>(null) }
-    var newEpisodeNameInput by remember { mutableStateOf("") }
-    var showStorageHelpDialog by remember { mutableStateOf(false) }
+    var newDramaTitle by remember { mutableStateOf("") }
 
-    val context = androidx.compose.ui.platform.LocalContext.current
-
-    // Media pickers with direct Cloud Storage Uri readying
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let { pickedUri ->
-            posterUrl = pickedUri.toString()
-            coroutineScope.launch {
-                snackbarHostState.showSnackbar("Imagem de capa selecionada para envio ao Cloud Storage!")
-            }
-        }
-    }
-
+    // Pickers
     val videoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let { pickedUri ->
-            videoUrl = pickedUri.toString()
-            coroutineScope.launch {
-                snackbarHostState.showSnackbar("Vídeo MP4 pronto para upload online no Cloud Storage!")
+        if (uri != null) {
+            val epNum = episodeList.size + 1
+            uploadViewModel.uploadVideo(uri, "ep_$epNum.mp4") { cloudUrl, localPath ->
+                episodeList.add(
+                    Episode(
+                        id = "temp_ep_$epNum",
+                        episodeNumber = epNum,
+                        title = "Episódio $epNum",
+                        videoUrl = cloudUrl ?: "",
+                        localUri = localPath ?: uri.toString()
+                    )
+                )
             }
         }
     }
 
-    // Sample Preset Covers
-    val presetCovers = listOf(
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80" to "Herdeira Elegante",
-        "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&auto=format&fit=crop&q=80" to "CEO Corporativo",
-        "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=800&auto=format&fit=crop&q=80" to "Mistério Urbano",
-        "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800&auto=format&fit=crop&q=80" to "Amor Proibido",
-        "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=800&auto=format&fit=crop&q=80" to "Épico & Fantasia"
-    )
+    val coverPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            uploadViewModel.uploadCover(uri, "cover.jpg") { url ->
+                if (url != null) coverUrl = url
+            }
+        }
+    }
 
-    // Sample Preset Videos
-    val presetVideos = listOf(
-        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" to "Trailer de Ação HD",
-        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" to "Cena Dramática CEO",
-        "https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4" to "Romance & Suspense",
-        "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" to "Comédia & Leveza",
-        "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" to "Épico Fantasia"
-    )
-
-    // Dialog for renaming drama
-    if (dramaToRename != null) {
-        val target = dramaToRename!!
+    // Modal de Diagnóstico
+    if (showDiagnosticDialog) {
         AlertDialog(
-            onDismissRequest = { dramaToRename = null },
-            title = { Text("Renomear Novela", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            onDismissRequest = { showDiagnosticDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.BugReport, contentDescription = null, tint = DramaCrimsonBright, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Diagnóstico da Nuvem (NYC)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+            },
             text = {
-                Column {
-                    Text("Digite o novo título para '${target.title}':", color = TextSecondary, fontSize = 14.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = newDramaNameInput,
-                        onValueChange = { newDramaNameInput = it },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().testTag("rename_drama_field"),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = DramaCrimsonBright,
-                            unfocusedBorderColor = DarkSurfaceHighlight,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
-                    )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (isRunningDiagnostic) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(color = DramaCrimsonBright)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("Testando conexão com Appwrite NYC...", color = TextSecondary, fontSize = 12.sp)
+                            }
+                        }
+                    } else if (diagnosticResult != null) {
+                        val report = diagnosticResult!!
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (report.items.all { it.isSuccess }) Color(0xFF1B382B) else Color(0xFF38231B)
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                        ) {
+                            Text(
+                                text = report.summary,
+                                color = if (report.items.all { it.isSuccess }) Color(0xFF81C784) else Color(0xFFFFB74D),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+
+                        report.items.forEach { item ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = DarkSurfaceHighlight.copy(alpha = 0.6f)),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = if (item.isSuccess) Icons.Filled.CheckCircle else Icons.Filled.Error,
+                                            contentDescription = null,
+                                            tint = if (item.isSuccess) Color(0xFF4CAF50) else Color(0xFFE53935),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(item.service, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(item.message, color = TextSecondary, fontSize = 12.sp)
+                                    if (!item.hint.isNullOrBlank()) {
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text("👉 Dica: ${item.hint}", color = DramaGold, fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Text("Clique em 'Iniciar Teste' para testar a comunicação com os bancos e buckets.", color = TextSecondary, fontSize = 13.sp)
+                    }
                 }
             },
             confirmButton = {
                 Button(
+                    onClick = { viewModel.runCloudDiagnostic() },
+                    colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson),
+                    enabled = !isRunningDiagnostic
+                ) {
+                    Text(if (diagnosticResult == null) "Iniciar Teste" else "Repetir Teste")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiagnosticDialog = false }) {
+                    Text("Fechar", color = TextSecondary)
+                }
+            },
+            containerColor = DarkSurfaceElevated
+        )
+    }
+
+    // Modal Renomear
+    if (dramaToRename != null) {
+        AlertDialog(
+            onDismissRequest = { dramaToRename = null },
+            title = { Text("Renomear Novela", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = newDramaTitle,
+                    onValueChange = { newDramaTitle = it },
+                    label = { Text("Novo Título") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
                     onClick = {
-                        if (newDramaNameInput.isNotBlank()) {
-                            viewModel.renameDrama(
-                                dramaId = target.id,
-                                newTitle = newDramaNameInput.trim(),
-                                onSuccess = {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("Título da novela renomeado online!")
-                                    }
-                                    dramaToRename = null
-                                },
-                                onError = { msg ->
-                                    coroutineScope.launch { snackbarHostState.showSnackbar(msg) }
-                                }
-                            )
+                        if (newDramaTitle.isNotBlank()) {
+                            viewModel.updateDramaTitle(dramaToRename!!.id, newDramaTitle)
+                            dramaToRename = null
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson)
@@ -247,436 +218,238 @@ fun PublishDramaScreen(
         )
     }
 
-    // Dialog for renaming episode
-    if (episodeToRename != null) {
-        val (drama, ep) = episodeToRename!!
-        AlertDialog(
-            onDismissRequest = { episodeToRename = null },
-            title = { Text("Renomear Vídeo / Episódio", color = TextPrimary, fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    Text("Digite o novo título do episódio:", color = TextSecondary, fontSize = 14.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = newEpisodeNameInput,
-                        onValueChange = { newEpisodeNameInput = it },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().testTag("rename_episode_field"),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = DramaCrimsonBright,
-                            unfocusedBorderColor = DarkSurfaceHighlight,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
-                    )
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(DarkBackground)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Estúdio de Publicação", color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            IconButton(
+                onClick = {
+                    showDiagnosticDialog = true
+                    if (diagnosticResult == null) viewModel.runCloudDiagnostic()
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (newEpisodeNameInput.isNotBlank()) {
-                            viewModel.renameEpisode(
-                                dramaId = drama.id,
-                                episodeId = ep.id,
-                                newTitle = newEpisodeNameInput.trim(),
-                                onSuccess = {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("Vídeo renomeado online com sucesso!")
-                                    }
-                                    episodeToRename = null
-                                },
-                                onError = { msg ->
-                                    coroutineScope.launch { snackbarHostState.showSnackbar(msg) }
-                                }
-                            )
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson)
-                ) {
-                    Text("Salvar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { episodeToRename = null }) {
-                    Text("Cancelar", color = TextSecondary)
-                }
-            },
-            containerColor = DarkSurfaceElevated
-        )
-    }
+            ) {
+                Icon(Icons.Filled.BugReport, contentDescription = "Diagnóstico", tint = DramaCrimsonBright)
+            }
+        }
 
-    // Dialog: Como Configurar Firebase Storage
-    if (showStorageHelpDialog) {
-        AlertDialog(
-            onDismissRequest = { showStorageHelpDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = DramaGold, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Configurar Firebase Storage", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                }
-            },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    Text(
-                        text = "Para armazenar vídeos MP4 e imagens na nuvem para todos os usuários online:",
-                        color = TextSecondary,
-                        fontSize = 13.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = DarkSurface,
+            contentColor = DramaCrimson
+        ) {
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = { Text("Novo Drama", fontWeight = FontWeight.SemiBold) }
+            )
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = { Text("Gerenciar / Renomear", fontWeight = FontWeight.SemiBold) }
+            )
+        }
 
-                    Text(
-                        text = "1. Ativar o Cloud Storage no Console:",
-                        color = DramaGold,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-                    Text(
-                        text = "Acesse console.firebase.google.com -> Selecione seu projeto -> No menu lateral clique em 'Storage' -> Clique no botão 'Começar' (Get started).",
-                        color = TextPrimary,
-                        fontSize = 12.sp
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Text(
-                        text = "2. Configurar Regras de Segurança (Rules):",
-                        color = DramaGold,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-                    Text(
-                        text = "Na aba 'Rules' do Storage, defina para permitir uploads de criadores:\n\nrules_version = '2';\nservice firebase.storage {\n  match /b/{bucket}/o {\n    match /{allPaths=**} {\n      allow read, write: if true;\n    }\n  }\n}",
-                        color = TextSecondary,
-                        fontSize = 11.sp,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+        if (selectedTab == 0) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                item {
+                    // Card Diagnóstico Rápido
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2638)),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(DarkSurface, RoundedCornerShape(6.dp))
-                            .padding(8.dp)
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Text(
-                        text = "3. Arquivo google-services.json:",
-                        color = DramaGold,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-                    Text(
-                        text = "Baixe o arquivo 'google-services.json' em Configurações do Projeto Firebase e substitua o arquivo dentro da pasta /app do seu repositório antes de gerar o APK.",
-                        color = TextPrimary,
-                        fontSize = 12.sp
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = DarkSurfaceHighlight.copy(alpha = 0.5f)),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "O app possui fallback automático: seus vídeos salvam e reproduzem instantaneamente mesmo antes de ativar o bucket!",
-                                color = TextPrimary,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { showStorageHelpDialog = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson)
-                ) {
-                    Text("Entendido")
-                }
-            },
-            containerColor = DarkSurfaceElevated
-        )
-    }
-
-    // Dialog: Diagnóstico de Conexão com a Nuvem
-    if (showDiagnosticDialog) {
-        AlertDialog(
-            onDismissRequest = { showDiagnosticDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Filled.BugReport,
-                        contentDescription = null,
-                        tint = DramaCrimsonBright,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "Diagnóstico da Nuvem",
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-                }
-            },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    if (isRunningDiagnostic) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                CircularProgressIndicator(color = DramaCrimsonBright, modifier = Modifier.size(36.dp))
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    "Testando conexões com Appwrite e Firebase...",
-                                    color = TextSecondary,
-                                    fontSize = 13.sp
-                                )
+                            .clickable {
+                                showDiagnosticDialog = true
+                                if (diagnosticResult == null) viewModel.runCloudDiagnostic()
                             }
-                        }
-                    } else if (diagnosticResult != null) {
-                        val report = diagnosticResult!!
-
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (report.items.all { it.isSuccess })
-                                    Color(0xFF1B382B)
-                                else
-                                    Color(0xFF38231B)
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                        ) {
-                            Text(
-                                text = report.summary,
-                                color = if (report.items.all { it.isSuccess }) Color(0xFF81C784) else Color(0xFFFFB74D),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(10.dp)
-                            )
-                        }
-
-                        report.items.forEach { item ->
-                            Card(
-                                colors = CardDefaults.cardColors(
-                                    containerColor = DarkSurfaceHighlight.copy(alpha = 0.6f)
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                            ) {
-                                Column(modifier = Modifier.padding(10.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = if (item.isSuccess) Icons.Filled.CheckCircle else Icons.Filled.Error,
-                                            contentDescription = null,
-                                            tint = if (item.isSuccess) Color(0xFF4CAF50) else Color(0xFFE53935),
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = item.service,
-                                            color = TextPrimary,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "(${item.target})",
-                                            color = TextTertiary,
-                                            fontSize = 11.sp
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = item.message,
-                                        color = TextSecondary,
-                                        fontSize = 12.sp
-                                    )
-
-                                    if (!item.hint.isNullOrBlank()) {
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "👉 Como resolver: ${item.hint}",
-                                            color = DramaGold,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        Text(
-                            "Clique no botão abaixo para verificar se o Appwrite e o Firebase estão prontos para receber seus vídeos e dados:",
-                            color = TextSecondary,
-                            fontSize = 13.sp
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.runCloudDiagnostic()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson),
-                    enabled = !isRunningDiagnostic
-                ) {
-                    Text(if (diagnosticResult == null) "Iniciar Teste Agora" else "Repetir Teste")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDiagnosticDialog = false }) {
-                    Text("Fechar", color = TextSecondary)
-                }
-            },
-            containerColor = DarkSurfaceElevated
-        )
-    }
-
-    Box(modifier = modifier.fillMaxSize().background(DarkBackground)) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 40.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Publicar & Upload",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                    )
-                    Text(
-                        text = "Publique seus vídeos e capas online para toda a comunidade",
-                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Botão de Diagnóstico da Nuvem
-                    IconButton(
-                        onClick = {
-                            showDiagnosticDialog = true
-                            if (diagnosticResult == null) {
-                                viewModel.runCloudDiagnostic()
-                            }
-                        },
-                        modifier = Modifier.size(36.dp)
                     ) {
-                        Icon(
-                            Icons.Filled.BugReport,
-                            contentDescription = "Diagnóstico da Nuvem",
-                            tint = DramaCrimsonBright,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { showStorageHelpDialog = true },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.Filled.Info,
-                            contentDescription = "Guia do Firebase Storage",
-                            tint = DramaGold,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-
-                    if (currentUser != null) {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Box(
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(DramaGold.copy(alpha = 0.2f))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Criador", color = DramaGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Icon(Icons.Filled.BugReport, contentDescription = null, tint = DramaCrimsonBright)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Diagnóstico da Nuvem (NYC)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text("Toque para testar Appwrite e Firebase", color = TextSecondary, fontSize = 11.sp)
+                            }
+                            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = TextSecondary)
                         }
                     }
                 }
-            }
 
-            // Tab Selector
-            TabRow(
-                selectedTabIndex = selectedModeTab,
-                containerColor = DarkSurface,
-                contentColor = DramaCrimsonBright,
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedModeTab]),
-                        color = DramaCrimsonBright,
-                        height = 3.dp
+                item {
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        label = { Text("Título da Novela") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Tab(
-                    selected = selectedModeTab == 0,
-                    onClick = { selectedModeTab = 0 },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
+
+                item {
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Sinopse / Descrição") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { coverPickerLauncher.launch("image/*") },
+                            colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceElevated),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.Image, contentDescription = null, tint = Color.White)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Novo Vídeo / Drama", fontWeight = FontWeight.Bold)
+                            Text("Selecionar Capa", fontSize = 12.sp)
                         }
-                    }
-                )
-                Tab(
-                    selected = selectedModeTab == 1,
-                    onClick = { selectedModeTab = 1 },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.VideoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Gerenciar & Renomear", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                )
-            }
 
-            if (selectedModeTab == 0) {
-                // Form Tab
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
+                        Button(
+                            onClick = { videoPickerLauncher.launch("video/*") },
+                            colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson),
+                            modifier = Modifier.weight(1f),
+                            enabled = !isUploading
+                        ) {
+                            Icon(Icons.Filled.VideoLibrary, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("+ Episódio MP4", fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                if (isUploading) {
                     item {
                         Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFF1E2638)
-                            ),
-                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(uploadStatusMessage ?: "Processando upload...", color = DramaGold, fontSize = 13.sp)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                LinearProgressIndicator(color = DramaCrimsonBright, modifier = Modifier.fillMaxWidth())
+                            }
+                        }
+                    }
+                }
+
+                if (coverUrl.isNotBlank()) {
+                    item {
+                        Text("Capa Selecionada:", color = TextSecondary, fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        AsyncImage(
+                            model = coverUrl,
+                            contentDescription = "Capa",
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    showDiagnosticDialog = true
-                                    if (diagnosticResult == null) {
-                                        viewModel.runCloudDiagnostic()
+                                .height(120.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+                    }
+                }
+
+                item {
+                    Text("Episódios Adicionados (${episodeList.size}):", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+
+                itemsIndexed(episodeList) { idx, ep ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("EP ${ep.episodeNumber}:", color = DramaGold, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(ep.title, color = TextPrimary, modifier = Modifier.weight(1f))
+                            IconButton(onClick = { episodeList.removeAt(idx) }) {
+                                Icon(Icons.Filled.Delete, contentDescription = "Remover", tint = Color.Red.copy(alpha = 0.7f))
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Button(
+                        onClick = {
+                            if (title.isNotBlank() && episodeList.isNotEmpty()) {
+                                viewModel.publishDrama(
+                                    title = title,
+                                    description = description,
+                                    genre = genre,
+                                    coverUrl = coverUrl,
+                                    bannerUrl = coverUrl,
+                                    episodes = episodeList.toList()
+                                ) { success ->
+                                    if (success) {
+                                        Toast.makeText(context, "Publicado com sucesso!", Toast.LENGTH_SHORT).show()
+                                        title = ""
+                                        description = ""
+                                        coverUrl = ""
+                                        episodeList.clear()
+                                        selectedTab = 1
                                     }
                                 }
+                            } else {
+                                Toast.makeText(context, "Informe o título e adicione ao menos 1 episódio!", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        enabled = !isPublishing
+                    ) {
+                        if (isPublishing) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp))
+                        } else {
+                            Text("Publicar Novela", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        } else {
+            // Aba 1: Gerenciar e Renomear
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (allDramas.isEmpty()) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                            Text("Nenhum drama disponível para gerenciar.", color = TextSecondary)
+                        }
+                    }
+                } else {
+                    itemsIndexed(allDramas) { _, drama ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
                                 modifier = Modifier
@@ -684,685 +457,25 @@ fun PublishDramaScreen(
                                     .padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
+                                AsyncImage(
+                                    model = drama.coverUrl.ifBlank { drama.bannerUrl },
+                                    contentDescription = drama.title,
                                     modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(DramaCrimson.copy(alpha = 0.2f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Filled.BugReport,
-                                        contentDescription = null,
-                                        tint = DramaCrimsonBright,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
+                                        .size(50.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Diagnóstico de Nuvem em Tempo Real",
-                                        color = TextPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
-                                    )
-                                    Text(
-                                        text = "Toque para testar Appwrite e Firebase instantaneamente",
-                                        color = TextSecondary,
-                                        fontSize = 12.sp
-                                    )
+                                    Text(drama.title, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text("${drama.genre} • ${drama.totalEpisodes} episódios", color = TextSecondary, fontSize = 12.sp)
                                 }
-                                Icon(
-                                    Icons.Filled.PlayArrow,
-                                    contentDescription = null,
-                                    tint = DramaGold,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    item {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text(
-                                    text = "1. Título & Informações do Drama",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = DramaGold
-                                    )
-                                )
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                OutlinedTextField(
-                                    value = dramaTitle,
-                                    onValueChange = { dramaTitle = it },
-                                    label = { Text("Nome da Minissérie / Drama *") },
-                                    placeholder = { Text("Ex: O Casamento Secreto do Bilionário") },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth().testTag("input_drama_title"),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = DramaCrimsonBright,
-                                        unfocusedBorderColor = DarkSurfaceHighlight,
-                                        focusedTextColor = TextPrimary,
-                                        unfocusedTextColor = TextPrimary,
-                                        focusedLabelColor = DramaCrimsonBright,
-                                        unfocusedLabelColor = TextSecondary
-                                    )
-                                )
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                OutlinedTextField(
-                                    value = synopsis,
-                                    onValueChange = { synopsis = it },
-                                    label = { Text("Sinopse / Descrição *") },
-                                    placeholder = { Text("Breve resumo dramático e envolvente...") },
-                                    maxLines = 3,
-                                    modifier = Modifier.fillMaxWidth().testTag("input_drama_synopsis"),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = DramaCrimsonBright,
-                                        unfocusedBorderColor = DarkSurfaceHighlight,
-                                        focusedTextColor = TextPrimary,
-                                        unfocusedTextColor = TextPrimary,
-                                        focusedLabelColor = DramaCrimsonBright,
-                                        unfocusedLabelColor = TextSecondary
-                                    )
-                                )
-
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text("Categoria:", color = TextSecondary, fontSize = 13.sp)
-                                Spacer(modifier = Modifier.height(6.dp))
-
-                                FlowRow(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                IconButton(
+                                    onClick = {
+                                        dramaToRename = drama
+                                        newDramaTitle = drama.title
+                                    }
                                 ) {
-                                    DramaCategory.values().filterNot { it == DramaCategory.TODAS || it == DramaCategory.EM_ALTA }.forEach { cat ->
-                                        val isSelected = selectedCategory == cat
-                                        FilterChip(
-                                            selected = isSelected,
-                                            onClick = { selectedCategory = cat },
-                                            label = { Text("${cat.iconEmoji} ${cat.displayName}", fontSize = 12.sp) },
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = DramaCrimson,
-                                                selectedLabelColor = Color.White,
-                                                containerColor = DarkSurface,
-                                                labelColor = TextSecondary
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Cover image section
-                    item {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text(
-                                    text = "2. Capa da Novela (Poster)",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = DramaGold
-                                    )
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .width(70.dp)
-                                            .aspectRatio(0.72f)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(DarkSurfaceHighlight)
-                                    ) {
-                                        AsyncImage(
-                                            model = posterUrl,
-                                            contentDescription = "Prévia da capa",
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.width(12.dp))
-
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Button(
-                                            onClick = { imagePickerLauncher.launch("image/*") },
-                                            colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson),
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.fillMaxWidth().testTag("pick_image_button")
-                                        ) {
-                                            Icon(Icons.Filled.Image, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Escolher da Galeria", fontSize = 12.sp)
-                                        }
-
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Text("Ou selecione uma capa pré-definida abaixo:", color = TextTertiary, fontSize = 11.sp)
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(10.dp))
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    items(presetCovers) { (url, label) ->
-                                        val isChosen = posterUrl == url
-                                        Box(
-                                            modifier = Modifier
-                                                .width(65.dp)
-                                                .aspectRatio(0.72f)
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .border(
-                                                    width = if (isChosen) 2.dp else 1.dp,
-                                                    color = if (isChosen) DramaCrimsonBright else Color.Transparent,
-                                                    shape = RoundedCornerShape(6.dp)
-                                                )
-                                                .clickable { posterUrl = url }
-                                        ) {
-                                            AsyncImage(
-                                                model = url,
-                                                contentDescription = label,
-                                                contentScale = ContentScale.Crop,
-                                                modifier = Modifier.fillMaxSize()
-                                            )
-                                            if (isChosen) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .align(Alignment.TopEnd)
-                                                        .padding(2.dp)
-                                                        .size(16.dp)
-                                                        .clip(CircleShape)
-                                                        .background(DramaCrimsonBright),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Icon(Icons.Outlined.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Video and episode renaming section
-                    item {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text(
-                                    text = "3. Vídeo e Título do Episódio",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = DramaGold
-                                    )
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                OutlinedTextField(
-                                    value = episodeTitle,
-                                    onValueChange = { episodeTitle = it },
-                                    label = { Text("Nome do Episódio (Exibido no Botão) *") },
-                                    placeholder = { Text("Ex: Episódio 1 - O Segredo Revelado") },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth().testTag("input_episode_title"),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = DramaCrimsonBright,
-                                        unfocusedBorderColor = DarkSurfaceHighlight,
-                                        focusedTextColor = TextPrimary,
-                                        unfocusedTextColor = TextPrimary,
-                                        focusedLabelColor = DramaCrimsonBright,
-                                        unfocusedLabelColor = TextSecondary
-                                    )
-                                )
-
-                                Spacer(modifier = Modifier.height(14.dp))
-
-                                Text("Origem do Vídeo do Episódio:", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.height(6.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    FilterChip(
-                                        selected = videoSourceType == 0,
-                                        onClick = { videoSourceType = 0 },
-                                        label = { Text("🔗 Link Direto (URL)", fontSize = 11.sp) },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = DramaCrimson,
-                                            selectedLabelColor = Color.White,
-                                            containerColor = DarkSurface,
-                                            labelColor = TextSecondary
-                                        )
-                                    )
-                                    FilterChip(
-                                        selected = videoSourceType == 1,
-                                        onClick = { videoSourceType = 1 },
-                                        label = { Text("📁 Galeria / Arquivo", fontSize = 11.sp) },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = DramaCrimson,
-                                            selectedLabelColor = Color.White,
-                                            containerColor = DarkSurface,
-                                            labelColor = TextSecondary
-                                        )
-                                    )
-                                    FilterChip(
-                                        selected = videoSourceType == 2,
-                                        onClick = { videoSourceType = 2 },
-                                        label = { Text("🎬 Testes Rápidos", fontSize = 11.sp) },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = DramaCrimson,
-                                            selectedLabelColor = Color.White,
-                                            containerColor = DarkSurface,
-                                            labelColor = TextSecondary
-                                        )
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                when (videoSourceType) {
-                                    0 -> {
-                                        // Link Direto: Fica camuflado no botão do episódio
-                                        OutlinedTextField(
-                                            value = directLinkInput,
-                                            onValueChange = {
-                                                directLinkInput = it
-                                                if (it.isNotBlank()) {
-                                                    videoUrl = VideoUrlResolver.resolveDirectVideoUrl(it.trim())
-                                                }
-                                            },
-                                            label = { Text("Link URL do Vídeo (Google Drive, Dropbox, MP4, HLS)") },
-                                            placeholder = { Text("https://drive.google.com/file/d/... ou https://exemplo.com/video.mp4") },
-                                            singleLine = true,
-                                            leadingIcon = {
-                                                Icon(Icons.Filled.Link, contentDescription = null, tint = DramaGold)
-                                            },
-                                            modifier = Modifier.fillMaxWidth().testTag("input_direct_link"),
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedBorderColor = DramaCrimsonBright,
-                                                unfocusedBorderColor = DarkSurfaceHighlight,
-                                                focusedTextColor = TextPrimary,
-                                                unfocusedTextColor = TextPrimary,
-                                                focusedLabelColor = DramaCrimsonBright,
-                                                unfocusedLabelColor = TextSecondary
-                                            )
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        
-                                        val isGoogleDrive = directLinkInput.contains("drive.google.com") || directLinkInput.contains("docs.google.com")
-                                        val isDropbox = directLinkInput.contains("dropbox.com")
-                                        val isHls = directLinkInput.contains(".m3u8")
-
-                                        if (isGoogleDrive) {
-                                            Text(
-                                                text = "✓ Google Drive detectado: link convertido automaticamente para streaming direto no app!",
-                                                color = Color(0xFF4CAF50),
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        } else if (isDropbox) {
-                                            Text(
-                                                text = "✓ Dropbox detectado: link convertido para download/streaming direto!",
-                                                color = Color(0xFF4CAF50),
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        } else if (isHls) {
-                                            Text(
-                                                text = "✓ Streaming HLS (.m3u8) detectado: suporte nativo ativado!",
-                                                color = Color(0xFF4CAF50),
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        } else {
-                                            Text(
-                                                text = "💡 O link fica 100% camuflado no botão do episódio. Quando o usuário clica no botão (ex: 'Episódio 1'), o vídeo do link é reproduzido instantaneamente em tela cheia.",
-                                                color = DramaGold.copy(alpha = 0.9f),
-                                                fontSize = 11.sp
-                                            )
-                                        }
-                                    }
-                                    1 -> {
-                                        // Galeria local
-                                        Button(
-                                            onClick = { videoPickerLauncher.launch("video/*") },
-                                            colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceHighlight),
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.fillMaxWidth().testTag("pick_video_button")
-                                        ) {
-                                            Icon(Icons.Filled.Movie, contentDescription = null, modifier = Modifier.size(16.dp), tint = TextPrimary)
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Selecionar Vídeo MP4 do Aparelho", fontSize = 12.sp, color = TextPrimary)
-                                        }
-                                    }
-                                    2 -> {
-                                        // Presets rápidos
-                                        Text("Selecione um vídeo streaming demonstrativo:", color = TextTertiary, fontSize = 11.sp)
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            items(presetVideos) { (url, name) ->
-                                                val isSelected = videoUrl == url
-                                                FilterChip(
-                                                    selected = isSelected,
-                                                    onClick = { videoUrl = url },
-                                                    label = { Text(name, fontSize = 11.sp) },
-                                                    colors = FilterChipDefaults.filterChipColors(
-                                                        selectedContainerColor = DramaGold,
-                                                        selectedLabelColor = Color.Black,
-                                                        containerColor = DarkSurface,
-                                                        labelColor = TextSecondary
-                                                    )
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text("Vídeo vinculado ao episódio:", color = TextSecondary, fontSize = 12.sp)
-                                Text(
-                                    text = videoUrl,
-                                    color = DramaCrimsonBright,
-                                    fontSize = 11.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-
-                    // Upload Progress and Publishing Card
-                    if (uploadProgress.isUploading) {
-                        item {
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth().border(1.dp, DramaGold, RoundedCornerShape(12.dp))
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        CircularProgressIndicator(
-                                            progress = { uploadProgress.progressPercent / 100f },
-                                            modifier = Modifier.size(28.dp),
-                                            color = DramaGold,
-                                            strokeWidth = 3.dp
-                                        )
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = "Upload Online para a Nuvem",
-                                                color = TextPrimary,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 14.sp
-                                            )
-                                            Text(
-                                                text = uploadProgress.currentStep,
-                                                color = DramaCrimsonBright,
-                                                fontSize = 12.sp
-                                            )
-                                        }
-                                        Text(
-                                            text = "${uploadProgress.progressPercent}%",
-                                            color = DramaGold,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    androidx.compose.material3.LinearProgressIndicator(
-                                        progress = { uploadProgress.progressPercent / 100f },
-                                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                                        color = DramaGold,
-                                        trackColor = DarkSurfaceHighlight
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Publish Button
-                    item {
-                        Button(
-                            onClick = {
-                                focusManager.clearFocus()
-                                if (dramaTitle.isBlank()) {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("Por favor, preencha o título do drama.")
-                                    }
-                                    return@Button
-                                }
-                                if (episodeTitle.isBlank()) {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("Por favor, dê um nome ao vídeo / episódio.")
-                                    }
-                                    return@Button
-                                }
-
-                                viewModel.publishNewDrama(
-                                    title = dramaTitle.trim(),
-                                    originalTitle = originalTitle.trim(),
-                                    synopsis = synopsis.ifBlank { "Minissérie dramática exclusiva publicada na Litoral Novelas." },
-                                    category = selectedCategory,
-                                    posterUrl = posterUrl,
-                                    bannerUrl = posterUrl,
-                                    episodeTitle = episodeTitle.trim(),
-                                    videoUrl = videoUrl,
-                                    durationSeconds = durationSeconds.toIntOrNull() ?: 120,
-                                    onSuccess = {
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar("Vídeo e novela publicados com sucesso para todos os usuários online!")
-                                        }
-                                        // Reset fields
-                                        dramaTitle = ""
-                                        episodeTitle = "Episódio 1"
-                                        directLinkInput = ""
-                                        onNavigateToFeed()
-                                    },
-                                    onError = { err ->
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar(err)
-                                        }
-                                    }
-                                )
-                            },
-                            enabled = !isPublishing,
-                            colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                                .testTag("publish_drama_button")
-                        ) {
-                            if (isPublishing) {
-                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text("Enviando para a Nuvem...", fontWeight = FontWeight.Bold, color = Color.White)
-                            } else {
-                                Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = Color.White)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Publicar Vídeo Agora (Online)", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Management & Renaming Tab
-                val userUid = currentUser?.uid
-                val userDramas = allDramas.filter { drama ->
-                    (userUid != null && drama.authorId == userUid) ||
-                    drama.id.startsWith("drama_user_") ||
-                    drama.id.startsWith("drama_1") ||
-                    drama.id.startsWith("drama_2") ||
-                    drama.authorName.contains("Litoral", ignoreCase = true) ||
-                    drama.authorId.startsWith("creator_")
-                }
-
-                if (userDramas.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Filled.Movie, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(48.dp))
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                "Nenhum vídeo publicado por você ainda.",
-                                color = TextPrimary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                "Publique seu primeiro vídeo na aba 'Novo Vídeo / Drama' para poder renomear e gerenciar aqui.",
-                                color = TextSecondary,
-                                fontSize = 13.sp,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Button(
-                                onClick = { selectedModeTab = 0 },
-                                colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson)
-                            ) {
-                                Text("Publicar Agora")
-                            }
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        items(userDramas) { drama ->
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .width(60.dp)
-                                                .aspectRatio(0.72f)
-                                                .clip(RoundedCornerShape(8.dp))
-                                        ) {
-                                            AsyncImage(
-                                                model = drama.posterUrl,
-                                                contentDescription = drama.title,
-                                                contentScale = ContentScale.Crop,
-                                                modifier = Modifier.fillMaxSize()
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.width(12.dp))
-
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = drama.title,
-                                                style = MaterialTheme.typography.titleMedium.copy(
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = TextPrimary
-                                                ),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            Text(
-                                                text = "${drama.category.displayName} • ${drama.episodes.size} episódios",
-                                                color = DramaGold,
-                                                fontSize = 12.sp
-                                            )
-                                        }
-
-                                        // Rename drama button
-                                        IconButton(
-                                            onClick = {
-                                                newDramaNameInput = drama.title
-                                                dramaToRename = drama
-                                            }
-                                        ) {
-                                            Icon(Icons.Filled.Edit, contentDescription = "Renomear novela", tint = DramaCrimsonBright)
-                                        }
-
-                                        // Delete drama button
-                                        IconButton(
-                                            onClick = {
-                                                viewModel.deleteDrama(
-                                                    dramaId = drama.id,
-                                                    onSuccess = {
-                                                        coroutineScope.launch {
-                                                            snackbarHostState.showSnackbar("Drama excluído com sucesso.")
-                                                        }
-                                                    },
-                                                    onError = { err ->
-                                                        coroutineScope.launch { snackbarHostState.showSnackbar(err) }
-                                                    }
-                                                )
-                                            }
-                                        ) {
-                                            Icon(Icons.Filled.Delete, contentDescription = "Excluir", tint = TextTertiary)
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Text("Vídeos & Episódios:", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    Spacer(modifier = Modifier.height(4.dp))
-
-                                    drama.episodes.forEach { ep ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 4.dp)
-                                                .background(DarkSurface, RoundedCornerShape(8.dp))
-                                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = DramaCrimsonBright, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = ep.title,
-                                                color = TextPrimary,
-                                                fontSize = 13.sp,
-                                                modifier = Modifier.weight(1f),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-
-                                            IconButton(
-                                                onClick = {
-                                                    newEpisodeNameInput = ep.title
-                                                    episodeToRename = Pair(drama, ep)
-                                                },
-                                                modifier = Modifier.size(28.dp)
-                                            ) {
-                                                Icon(Icons.Filled.Edit, contentDescription = "Renomear vídeo", tint = TextSecondary, modifier = Modifier.size(16.dp))
-                                            }
-                                        }
-                                    }
+                                    Icon(Icons.Filled.Edit, contentDescription = "Renomear", tint = DramaGold)
                                 }
                             }
                         }
@@ -1370,10 +483,5 @@ fun PublishDramaScreen(
                 }
             }
         }
-
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
     }
 }

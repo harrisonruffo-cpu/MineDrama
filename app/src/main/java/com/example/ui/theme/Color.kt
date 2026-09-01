@@ -2,33 +2,19 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Litoral Novelas - Palette & Aesthetics ("Histórias que emocionam")
-val LitoralWaveBlue = Color(0xFF0077B6)
-val LitoralCyanBright = Color(0xFF00E5FF)
-val LitoralElectricBlue = Color(0xFF0096C7)
-val LitoralSkyBlue = Color(0xFF38BDF8)
-val LitoralDeepNavy = Color(0xFF050B14)
-val LitoralGold = Color(0xFFE5B869)
-val LitoralGoldBright = Color(0xFFFFD166)
-val LitoralChromeSilver = Color(0xFFE2E8F0)
-val LitoralSilverMuted = Color(0xFF94A3B8)
+val DramaCrimson = Color(0xFFE50914)
+val DramaCrimsonBright = Color(0xFFFF2A36)
+val DramaGold = Color(0xFFFFD700)
+val DramaGoldDark = Color(0xFFC79C00)
 
-// Semantic Theme aliases
-val DramaCrimson = Color(0xFF0096C7)
-val DramaCrimsonBright = Color(0xFF00E5FF)
-val DramaGold = Color(0xFFE5B869)
-val DramaGoldBright = Color(0xFFFFD166)
+val DarkBackground = Color(0xFF0D0F14)
+val DarkSurface = Color(0xFF161922)
+val DarkSurfaceElevated = Color(0xFF1E2330)
+val DarkSurfaceHighlight = Color(0xFF2B3245)
 
-val DarkBackground = Color(0xFF050B14)
-val DarkSurface = Color(0xFF0B1526)
-val DarkSurfaceElevated = Color(0xFF102038)
-val DarkSurfaceHighlight = Color(0xFF1B3256)
+val TextPrimary = Color(0xFFF5F5F7)
+val TextSecondary = Color(0xFFA0A6B5)
+val TextTertiary = Color(0xFF6B7280)
 
-val TextPrimary = Color(0xFFFFFFFF)
-val TextSecondary = Color(0xFFCBD5E1)
-val TextTertiary = Color(0xFF64748B)
-
-val OverlayDark = Color(0xCC050B14)
-val AccentPurple = Color(0xFF0077B6)
-val AccentRose = Color(0xFF00E5FF)
-
+val StatusFree = Color(0xFF4CAF50)
+val StatusVip = Color(0xFFFFD700)

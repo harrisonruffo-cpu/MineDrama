@@ -3,47 +3,28 @@ package com.example.data.util
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
 object MediaStorageHelper {
+    private const val TAG = "MediaStorageHelper"
 
-    suspend fun copyUriToInternalStorage(
-        context: Context,
-        uri: Uri,
-        subfolder: String,
-        prefix: String
-    ): String = withContext(Dispatchers.IO) {
-        try {
-            if (uri.scheme == "http" || uri.scheme == "https") {
-                return@withContext uri.toString()
+    fun copyUriToLocalStorage(context: Context, uri: Uri, fileName: String): String? {
+        return try {
+            val mediaDir = File(context.filesDir, "media_uploads")
+            if (!mediaDir.exists()) {
+                mediaDir.mkdirs()
             }
-
-            val dir = File(context.filesDir, subfolder).apply {
-                if (!exists()) mkdirs()
-            }
-
-            val extension = when (subfolder) {
-                "videos" -> ".mp4"
-                "covers" -> ".jpg"
-                else -> ""
-            }
-
-            val fileName = "${prefix}_${System.currentTimeMillis()}$extension"
-            val destFile = File(dir, fileName)
-
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                FileOutputStream(destFile).use { outputStream ->
-                    inputStream.copyTo(outputStream)
+            val destination = File(mediaDir, fileName)
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(destination).use { output ->
+                    input.copyTo(output)
                 }
             }
-            Log.d("MediaStorageHelper", "File copied successfully to ${destFile.absolutePath}")
-            return@withContext Uri.fromFile(destFile).toString()
+            destination.absolutePath
         } catch (e: Exception) {
-            Log.e("MediaStorageHelper", "Failed to copy URI to internal storage", e)
-            return@withContext uri.toString()
+            Log.e(TAG, "Erro salvando arquivo local: ${e.message}")
+            null
         }
     }
 }

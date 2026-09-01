@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import com.example.Appwrite
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
 import io.appwrite.Query
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
@@ -42,7 +41,7 @@ class CloudDiagnosticManager(private val context: Context) {
                         service = "Appwrite Auth",
                         target = "Sessão Anônima / Usuário",
                         isSuccess = true,
-                        message = "Conectado e autenticado com sucesso no Appwrite Cloud (Project: ${Appwrite.PROJECT_ID})"
+                        message = "Conectado e autenticado com sucesso no Appwrite NYC Cloud (Project: ${Appwrite.PROJECT_ID})"
                     )
                 )
             } else {

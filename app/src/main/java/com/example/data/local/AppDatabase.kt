@@ -7,9 +7,10 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [
-        WatchHistoryEntity::class,
+        DramaEntity::class,
+        EpisodeEntity::class,
         FavoriteEntity::class,
-        LikedEpisodeEntity::class
+        HistoryEntity::class
     ],
     version = 1,
     exportSchema = false
@@ -26,10 +27,8 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "mine_drama_database"
-                )
-                    .fallbackToDestructiveMigration()
-                    .build()
+                    "litoral_novelas.db"
+                ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
             }

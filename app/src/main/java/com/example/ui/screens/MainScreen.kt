@@ -1,349 +1,199 @@
 package com.example.ui.screens
 
-import android.app.Activity
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.PlayCircleFilled
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Tv
-import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.outlined.CloudUpload
-import androidx.compose.material.icons.outlined.Movie
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Tv
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
 import com.example.data.model.Drama
 import com.example.ui.components.AuthDialog
+import com.example.ui.components.EpisodesBottomSheet
 import com.example.ui.components.VerticalEpisodePlayer
 import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.DarkSurface
-import com.example.ui.theme.DarkSurfaceElevated
-import com.example.ui.theme.DramaCrimsonBright
-import com.example.ui.theme.LitoralCyanBright
-import com.example.ui.theme.LitoralGold
-import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.DramaCrimson
 import com.example.ui.theme.TextSecondary
 import com.example.ui.viewmodel.DramaViewModel
-
-enum class MainTab(
-    val title: String,
-    val selectedIcon: androidx.compose.ui.graphics.vector.ImageVector,
-    val unselectedIcon: androidx.compose.ui.graphics.vector.ImageVector
-) {
-    PARA_VOCE("Para Você", Icons.Filled.PlayCircleFilled, Icons.Outlined.Movie),
-    NOVELAS("Novelas", Icons.Filled.Tv, Icons.Outlined.Tv),
-    PUBLICAR("Publicar", Icons.Filled.CloudUpload, Icons.Outlined.CloudUpload),
-    EXPLORAR("Explorar", Icons.Filled.Search, Icons.Outlined.Search),
-    PERFIL("Perfil", Icons.Filled.AccountCircle, Icons.Outlined.AccountCircle)
-}
+import com.example.ui.viewmodel.VideoUploadViewModel
 
 @Composable
 fun MainScreen(
-    viewModel: DramaViewModel,
-    modifier: Modifier = Modifier
+    dramaViewModel: DramaViewModel,
+    uploadViewModel: VideoUploadViewModel
 ) {
-    val context = LocalContext.current
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    var showExitDialog by remember { mutableStateOf(false) }
+    var currentNavIndex by remember { mutableIntStateOf(0) }
+    var selectedDramaForDetail by remember { mutableStateOf<Drama?>(null) }
     var showAuthDialog by remember { mutableStateOf(false) }
+    var showEpisodesSheet by remember { mutableStateOf(false) }
 
-    val allDramas by viewModel.allDramas.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val selectedCategory by viewModel.selectedCategory.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    val searchResults by viewModel.searchResults.collectAsState()
-    val playbackFeed by viewModel.playbackFeed.collectAsState()
-    val currentFeedIndex by viewModel.currentFeedIndex.collectAsState()
-    val selectedDramaForDetail by viewModel.selectedDramaForDetail.collectAsState()
-    val currentUser by viewModel.currentUser.collectAsState()
+    val allDramas by dramaViewModel.allDramas.collectAsState()
+    val currentDrama by dramaViewModel.currentDrama.collectAsState()
+    val currentEpisodeIndex by dramaViewModel.currentEpisodeIndex.collectAsState()
+    val favoriteDramaIds by dramaViewModel.favoriteDramaIds.collectAsState()
+    val currentUser by dramaViewModel.currentUser.collectAsState()
 
-    val favorites by viewModel.favorites.collectAsState()
-    val watchHistory by viewModel.watchHistory.collectAsState()
-    val likedKeys by viewModel.likedKeys.collectAsState()
-
-    val currentDetailDrama = selectedDramaForDetail
-
-    // Android Back Button Handler
-    BackHandler(enabled = true) {
-        if (showAuthDialog) {
-            showAuthDialog = false
-        } else if (currentDetailDrama != null) {
-            viewModel.closeDramaDetails()
-        } else if (selectedTab != 0) {
-            selectedTab = 0
-        } else {
-            // We are on the root home screen -> ask confirmation before exiting
-            showExitDialog = true
-        }
-    }
-
-    // Exit Confirmation Dialog
-    if (showExitDialog) {
-        AlertDialog(
-            onDismissRequest = { showExitDialog = false },
-            containerColor = DarkSurfaceElevated,
-            shape = RoundedCornerShape(20.dp),
-            title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.litoral_novelas_logo_1788090147754),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .border(1.dp, LitoralCyanBright.copy(alpha = 0.6f), RoundedCornerShape(6.dp)),
-                        contentScale = ContentScale.Crop
-                    )
-                    Text(
-                        text = "Sair do Litoral Novelas?",
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp
-                    )
-                }
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "Tem certeza de que deseja sair do aplicativo agora?",
-                        color = TextPrimary,
-                        fontSize = 14.sp
-                    )
-                    Text(
-                        text = "Seu histórico, curtidas e episódios assistidos continuam salvos na nuvem.",
-                        color = TextSecondary,
-                        fontSize = 12.sp
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showExitDialog = false
-                        (context as? Activity)?.finish()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = DramaCrimsonBright,
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.ExitToApp,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Sair do App", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                OutlinedButton(
-                    onClick = { showExitDialog = false },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = LitoralCyanBright),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, LitoralCyanBright.copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Continuar Assistindo")
-                }
-            }
-        )
-    }
-
-    // Authentication Dialog (Google, Email, Register, Forgot Password)
     if (showAuthDialog) {
         AuthDialog(
-            viewModel = viewModel,
-            onDismiss = { showAuthDialog = false }
+            onDismiss = { showAuthDialog = false },
+            onLogin = { name, email ->
+                dramaViewModel.login(name, email)
+                showAuthDialog = false
+            }
         )
     }
 
-    Box(modifier = modifier.fillMaxSize().background(DarkBackground)) {
-        Scaffold(
-            bottomBar = {
+    if (showEpisodesSheet && currentDrama != null) {
+        EpisodesBottomSheet(
+            dramaTitle = currentDrama!!.title,
+            episodes = currentDrama!!.episodes,
+            currentEpisodeIndex = currentEpisodeIndex,
+            onSelectEpisode = { idx ->
+                dramaViewModel.selectEpisode(idx)
+            },
+            onDismiss = { showEpisodesSheet = false }
+        )
+    }
+
+    Scaffold(
+        bottomBar = {
+            if (selectedDramaForDetail == null) {
                 NavigationBar(
                     containerColor = DarkSurface,
-                    contentColor = TextPrimary,
-                    tonalElevation = 8.dp
+                    contentColor = DramaCrimson
                 ) {
-                    MainTab.values().forEachIndexed { index, tab ->
-                        val isSelected = selectedTab == index && currentDetailDrama == null
-                        NavigationBarItem(
-                            selected = isSelected,
-                            onClick = {
-                                viewModel.closeDramaDetails()
-                                selectedTab = index
-                            },
-                            icon = {
-                                Icon(
-                                    imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
-                                    contentDescription = tab.title,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            },
-                            label = {
-                                Text(
-                                    text = tab.title,
-                                    fontSize = 10.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = LitoralCyanBright,
-                                selectedTextColor = LitoralCyanBright,
-                                unselectedIconColor = TextSecondary,
-                                unselectedTextColor = TextSecondary,
-                                indicatorColor = Color.Transparent
-                            ),
-                            modifier = Modifier.testTag("nav_tab_${tab.name.lowercase()}")
+                    NavigationBarItem(
+                        selected = currentNavIndex == 0,
+                        onClick = { currentNavIndex = 0 },
+                        icon = { Icon(Icons.Filled.PlayCircle, contentDescription = "Para Você") },
+                        label = { Text("Para Você", fontSize = 10.sp, fontWeight = FontWeight.Medium) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = DramaCrimson,
+                            selectedTextColor = DramaCrimson,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary,
+                            indicatorColor = Color.Transparent
                         )
-                    }
+                    )
+                    NavigationBarItem(
+                        selected = currentNavIndex == 1,
+                        onClick = { currentNavIndex = 1 },
+                        icon = { Icon(Icons.Filled.Tv, contentDescription = "Novelas") },
+                        label = { Text("Novelas", fontSize = 10.sp, fontWeight = FontWeight.Medium) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = DramaCrimson,
+                            selectedTextColor = DramaCrimson,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary,
+                            indicatorColor = Color.Transparent
+                        )
+                    )
+                    NavigationBarItem(
+                        selected = currentNavIndex == 2,
+                        onClick = { currentNavIndex = 2 },
+                        icon = { Icon(Icons.Filled.Search, contentDescription = "Explorar") },
+                        label = { Text("Explorar", fontSize = 10.sp, fontWeight = FontWeight.Medium) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = DramaCrimson,
+                            selectedTextColor = DramaCrimson,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary,
+                            indicatorColor = Color.Transparent
+                        )
+                    )
+                    NavigationBarItem(
+                        selected = currentNavIndex == 3,
+                        onClick = { currentNavIndex = 3 },
+                        icon = { Icon(Icons.Filled.CloudUpload, contentDescription = "Publicar") },
+                        label = { Text("Publicar", fontSize = 10.sp, fontWeight = FontWeight.Medium) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = DramaCrimson,
+                            selectedTextColor = DramaCrimson,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary,
+                            indicatorColor = Color.Transparent
+                        )
+                    )
+                    NavigationBarItem(
+                        selected = currentNavIndex == 4,
+                        onClick = { currentNavIndex = 4 },
+                        icon = { Icon(Icons.Filled.Favorite, contentDescription = "Minha Lista") },
+                        label = { Text("Minha Lista", fontSize = 10.sp, fontWeight = FontWeight.Medium) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = DramaCrimson,
+                            selectedTextColor = DramaCrimson,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary,
+                            indicatorColor = Color.Transparent
+                        )
+                    )
                 }
             }
-        ) { innerPadding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = innerPadding.calculateBottomPadding())
-            ) {
-                // If detail screen is active
-                if (currentDetailDrama != null) {
-                    val isFav = favorites.any { it.dramaId == currentDetailDrama.id }
-                    DramaDetailScreen(
-                        drama = currentDetailDrama,
-                        isFavorite = isFav,
-                        onBack = { viewModel.closeDramaDetails() },
-                        onPlayEpisode = { epNum ->
-                            viewModel.closeDramaDetails()
-                            viewModel.playDramaEpisode(currentDetailDrama.id, epNum) {
-                                selectedTab = 0
+        },
+        containerColor = DarkBackground
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(if (selectedDramaForDetail == null) innerPadding else androidx.compose.foundation.layout.PaddingValues())
+        ) {
+            if (selectedDramaForDetail != null) {
+                DramaDetailScreen(
+                    drama = selectedDramaForDetail!!,
+                    viewModel = dramaViewModel,
+                    onBack = { selectedDramaForDetail = null },
+                    onPlayEpisode = { epIdx ->
+                        dramaViewModel.selectDrama(selectedDramaForDetail!!, epIdx)
+                        selectedDramaForDetail = null
+                        currentNavIndex = 0
+                    }
+                )
+            } else {
+                when (currentNavIndex) {
+                    0 -> {
+                        // FEED VERTICAL (Estilo TikTok)
+                        if (allDramas.isNotEmpty()) {
+                            val activeDrama = currentDrama ?: allDramas.first()
+                            val episodes = activeDrama.episodes
+                            if (episodes.isNotEmpty()) {
+                                val currentEp = episodes.getOrNull(currentEpisodeIndex) ?: episodes.first()
+                                VerticalEpisodePlayer(
+                                    drama = activeDrama,
+                                    episode = currentEp,
+                                    isPlaying = true,
+                                    isLiked = favoriteDramaIds.contains(activeDrama.id),
+                                    onToggleLike = { dramaViewModel.toggleFavorite(activeDrama.id) },
+                                    onOpenEpisodesSheet = { showEpisodesSheet = true },
+                                    onNextEpisode = { dramaViewModel.nextEpisode() }
+                                )
                             }
-                        },
-                        onToggleFavorite = { viewModel.toggleFavorite(currentDetailDrama) }
-                    )
-                } else {
-                    when (selectedTab) {
-                        0 -> {
-                            VerticalEpisodePlayer(
-                                items = playbackFeed,
-                                initialIndex = currentFeedIndex,
-                                isFavorite = { dramaId -> favorites.any { it.dramaId == dramaId } },
-                                isLiked = { dramaId, epNum -> likedKeys.contains("${dramaId}_$epNum") },
-                                onToggleFavorite = { drama -> viewModel.toggleFavorite(drama) },
-                                onToggleLike = { dramaId, epNum -> viewModel.toggleLike(dramaId, epNum) },
-                                onPageChanged = { page -> viewModel.onFeedPageChanged(page) },
-                                onProgressUpdate = { drama, epNum, pos, dur ->
-                                    viewModel.saveWatchProgress(drama, epNum, pos, dur)
-                                },
-                                onSearchClick = { selectedTab = 3 },
-                                onDramaDetailsClick = { drama -> viewModel.openDramaDetails(drama) },
-                                currentUser = currentUser,
-                                onLoginClick = { showAuthDialog = true }
-                            )
-                        }
-                        1 -> {
-                            NovelasCatalogScreen(
-                                dramas = allDramas,
-                                isLoading = isLoading,
-                                selectedCategory = selectedCategory,
-                                onCategorySelected = { viewModel.selectCategory(it) },
-                                onDramaClick = { drama -> viewModel.openDramaDetails(drama) },
-                                onWatchClick = { drama ->
-                                    viewModel.playDramaEpisode(drama.id, 1) {
-                                        selectedTab = 0
-                                    }
-                                },
-                                onSearchClick = { selectedTab = 3 },
-                                onRefreshCatalog = { viewModel.loadCatalog(forceRefresh = true) },
-                                currentUser = currentUser,
-                                onLoginClick = { showAuthDialog = true }
-                            )
-                        }
-                        2 -> {
-                            PublishDramaScreen(
-                                viewModel = viewModel,
-                                onNavigateToFeed = { selectedTab = 0 }
-                            )
-                        }
-                        3 -> {
-                            ExploreSearchScreen(
-                                searchQuery = searchQuery,
-                                searchResults = searchResults,
-                                allDramas = allDramas,
-                                onSearchQueryChanged = { viewModel.onSearchQueryChanged(it) },
-                                onDramaClick = { drama -> viewModel.openDramaDetails(drama) }
-                            )
-                        }
-                        4 -> {
-                            MyListScreen(
-                                viewModel = viewModel,
-                                onPlayEpisode = { dramaId, epNum ->
-                                    viewModel.playDramaEpisode(dramaId, epNum) {
-                                        selectedTab = 0
-                                    }
-                                },
-                                onDramaClick = { drama -> viewModel.openDramaDetails(drama) },
-                                onExploreClick = { selectedTab = 1 },
-                                onNavigateToUpload = { selectedTab = 2 }
-                            )
                         }
                     }
+                    1 -> NovelasCatalogScreen(
+                        viewModel = dramaViewModel,
+                        onDramaSelected = { drama -> selectedDramaForDetail = drama }
+                    )
+                    2 -> ExploreSearchScreen(
+                        viewModel = dramaViewModel,
+                        onDramaSelected = { drama -> selectedDramaForDetail = drama }
+                    )
+                    3 -> PublishDramaScreen(
+                        viewModel = dramaViewModel,
+                        uploadViewModel = uploadViewModel
+                    )
+                    4 -> MyListScreen(
+                        viewModel = dramaViewModel,
+                        onDramaSelected = { drama -> selectedDramaForDetail = drama }
+                    )
                 }
             }
         }
     }
 }
-

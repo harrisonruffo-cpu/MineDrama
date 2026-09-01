@@ -1,6 +1,8 @@
 {
   "name": "Litoral Novelas",
-  "description": "Litoral Novelas - Histórias que emocionam. Streaming e publicação de minisséries e novelas curtas em formato vertical com reprodução fluida e nuvem Firebase.",
+  "description": "Aplicativo de streaming e publicação de mini novelas e dramas em formato vertical com suporte a Appwrite e Firebase Cloud.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

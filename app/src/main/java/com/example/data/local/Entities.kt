@@ -2,37 +2,51 @@ package com.example.data.local
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.example.data.model.Drama
+import com.example.data.model.Episode
 
-@Entity(tableName = "watch_history")
-data class WatchHistoryEntity(
-    @PrimaryKey
-    val dramaId: String,
-    val dramaTitle: String,
-    val posterUrl: String,
-    val lastEpisodeNumber: Int,
-    val lastPositionMs: Long,
-    val durationMs: Long,
+@Entity(tableName = "dramas")
+data class DramaEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val description: String,
+    val coverUrl: String,
+    val bannerUrl: String,
+    val genre: String,
+    val tagsJson: String,
     val totalEpisodes: Int,
-    val updatedAt: Long = System.currentTimeMillis()
+    val rating: Double,
+    val viewsCount: Long,
+    val likesCount: Long,
+    val isTrending: Boolean,
+    val isFeatured: Boolean,
+    val isPublishedLocally: Boolean,
+    val createdAt: Long
 )
 
-@Entity(tableName = "favorites")
-data class FavoriteEntity(
-    @PrimaryKey
+@Entity(tableName = "episodes")
+data class EpisodeEntity(
+    @PrimaryKey val id: String,
     val dramaId: String,
-    val dramaTitle: String,
-    val posterUrl: String,
-    val categoryName: String,
-    val rating: Double,
-    val totalEpisodes: Int,
+    val episodeNumber: Int,
+    val title: String,
+    val videoUrl: String,
+    val durationSeconds: Int,
+    val isFree: Boolean,
+    val thumbnail: String,
+    val localUri: String?
+)
+
+@Entity(tableName = "user_favorites")
+data class FavoriteEntity(
+    @PrimaryKey val dramaId: String,
     val addedAt: Long = System.currentTimeMillis()
 )
 
-@Entity(tableName = "liked_episodes")
-data class LikedEpisodeEntity(
-    @PrimaryKey
-    val compositeKey: String, // dramaId_episodeNumber
-    val dramaId: String,
-    val episodeNumber: Int,
-    val likedAt: Long = System.currentTimeMillis()
+@Entity(tableName = "watch_history")
+data class HistoryEntity(
+    @PrimaryKey val dramaId: String,
+    val lastEpisodeNumber: Int,
+    val lastPositionMs: Long,
+    val updatedAt: Long = System.currentTimeMillis()
 )
