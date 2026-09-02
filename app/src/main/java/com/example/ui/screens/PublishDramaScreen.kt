@@ -60,6 +60,11 @@ fun PublishDramaScreen(
     var dramaToRename by remember { mutableStateOf<Drama?>(null) }
     var newDramaTitle by remember { mutableStateOf("") }
 
+    // Dialog YouTube Episode states
+    var showYouTubeDialog by remember { mutableStateOf(false) }
+    var youtubeTitleInput by remember { mutableStateOf("") }
+    var youtubeUrlInput by remember { mutableStateOf("") }
+
     // Pickers
     val videoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -218,6 +223,76 @@ fun PublishDramaScreen(
         )
     }
 
+    if (showYouTubeDialog) {
+        AlertDialog(
+            onDismissRequest = { showYouTubeDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.SmartDisplay, contentDescription = null, tint = DramaCrimsonBright)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Adicionar via YouTube / Link", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "Insira o título do episódio e o link do YouTube (vídeo ou shorts) ou link direto de vídeo.",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                    OutlinedTextField(
+                        value = youtubeTitleInput,
+                        onValueChange = { youtubeTitleInput = it },
+                        label = { Text("Título do Episódio") },
+                        placeholder = { Text("Ex: Episódio ${episodeList.size + 1}") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = youtubeUrlInput,
+                        onValueChange = { youtubeUrlInput = it },
+                        label = { Text("Link YouTube / Vídeo") },
+                        placeholder = { Text("https://www.youtube.com/watch?v=...") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (youtubeUrlInput.isNotBlank()) {
+                            val epNum = episodeList.size + 1
+                            val finalTitle = youtubeTitleInput.ifBlank { "Episódio $epNum" }
+                            episodeList.add(
+                                Episode(
+                                    id = "temp_ep_$epNum",
+                                    episodeNumber = epNum,
+                                    title = finalTitle,
+                                    videoUrl = youtubeUrlInput.trim(),
+                                    localUri = ""
+                                )
+                            )
+                            youtubeTitleInput = ""
+                            youtubeUrlInput = ""
+                            showYouTubeDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson),
+                    enabled = youtubeUrlInput.isNotBlank()
+                ) {
+                    Text("Adicionar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showYouTubeDialog = false }) {
+                    Text("Cancelar", color = TextSecondary)
+                }
+            },
+            containerColor = DarkSurfaceElevated
+        )
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -323,19 +398,32 @@ fun PublishDramaScreen(
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Filled.Image, contentDescription = null, tint = Color.White)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Selecionar Capa", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Capa", fontSize = 11.sp)
                         }
 
                         Button(
                             onClick = { videoPickerLauncher.launch("video/*") },
                             colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson),
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1.1f),
                             enabled = !isUploading
                         ) {
                             Icon(Icons.Filled.VideoLibrary, contentDescription = null, tint = Color.White)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("+ Episódio MP4", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("+ Vídeo MP4", fontSize = 11.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                youtubeTitleInput = "Episódio ${episodeList.size + 1}"
+                                showYouTubeDialog = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC4302B)),
+                            modifier = Modifier.weight(1.1f)
+                        ) {
+                            Icon(Icons.Filled.SmartDisplay, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("+ YouTube", fontSize = 11.sp)
                         }
                     }
                 }

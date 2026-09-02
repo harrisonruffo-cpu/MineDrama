@@ -20,18 +20,25 @@ class AppwriteDramaDataSource {
             val db = Appwrite.databases ?: return@withContext emptyList()
             Appwrite.ensureSession()
 
-            val response = db.listDocuments(
-                databaseId = Appwrite.DATABASE_ID,
-                collectionId = Appwrite.COLLECTION_DRAMAS,
-                queries = listOf(
-                    Query.limit(100),
-                    Query.orderDesc("\$createdAt")
+            val response = try {
+                db.listDocuments(
+                    databaseId = Appwrite.DATABASE_ID,
+                    collectionId = Appwrite.COLLECTION_DRAMAS,
+                    queries = listOf(Query.limit(100))
                 )
-            )
+            } catch (queryErr: Throwable) {
+                Log.w(TAG, "Tentando listar sem queries: ${queryErr.message}")
+                db.listDocuments(
+                    databaseId = Appwrite.DATABASE_ID,
+                    collectionId = Appwrite.COLLECTION_DRAMAS
+                )
+            }
 
-            response.documents.mapNotNull { doc ->
+            val dramas = response.documents.mapNotNull { doc ->
                 mapDocumentToDrama(doc)
             }
+            Log.d(TAG, "Total de dramas carregados da Nuvem Appwrite: ${dramas.size}")
+            dramas
         } catch (e: Throwable) {
             Log.e(TAG, "Erro ao listar dramas do Appwrite: ${e.message}")
             emptyList()

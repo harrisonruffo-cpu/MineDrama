@@ -120,6 +120,15 @@ fun MainScreen(
         )
     }
 
+    if (currentUser == null) {
+        LoginGateScreen(
+            onGoogleLogin = { dramaViewModel.loginWithGoogle() },
+            onFacebookLogin = { dramaViewModel.loginWithFacebook() },
+            onEmailLogin = { name, email -> dramaViewModel.login(name, email) }
+        )
+        return
+    }
+
     if (showAuthDialog) {
         AuthDialog(
             onDismiss = { showAuthDialog = false },
@@ -129,6 +138,10 @@ fun MainScreen(
             },
             onGoogleLogin = {
                 dramaViewModel.loginWithGoogle()
+                showAuthDialog = false
+            },
+            onFacebookLogin = {
+                dramaViewModel.loginWithFacebook()
                 showAuthDialog = false
             }
         )

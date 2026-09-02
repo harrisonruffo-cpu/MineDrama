@@ -1,6 +1,11 @@
 package com.example.ui.components
 
+import android.annotation.SuppressLint
 import android.net.Uri
+import android.webkit.WebChromeClient
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -30,12 +35,14 @@ import androidx.media3.ui.PlayerView
 import com.example.data.model.Drama
 import com.example.data.model.Episode
 import com.example.data.util.VideoUrlResolver
+import com.example.data.util.YouTubeHelper
 import com.example.ui.theme.DramaCrimson
 import com.example.ui.theme.DramaCrimsonBright
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
 
+@SuppressLint("SetJavaScriptEnabled")
 @OptIn(UnstableApi::class)
 @Composable
 fun VerticalEpisodePlayer(
@@ -61,28 +68,42 @@ fun VerticalEpisodePlayer(
         }
     }
 
-    val exoPlayer = remember(videoSource) {
-        try {
-            ExoPlayer.Builder(context).build().apply {
-                if (videoSource.isNotBlank()) {
-                    val mediaItem = MediaItem.fromUri(Uri.parse(videoSource))
-                    setMediaItem(mediaItem)
-                    repeatMode = Player.REPEAT_MODE_ONE
-                    prepare()
-                    playWhenReady = isPlaying
-                }
-                addListener(object : Player.Listener {
-                    override fun onPlaybackStateChanged(state: Int) {
-                        isVideoBuffering = state == Player.STATE_BUFFERING
-                    }
+    val isYouTube = remember(videoSource) {
+        YouTubeHelper.isYouTubeUrl(videoSource)
+    }
 
-                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                        isVideoBuffering = false
-                    }
-                })
-            }
-        } catch (e: Throwable) {
+    val youtubeVideoId = remember(videoSource) {
+        YouTubeHelper.extractVideoId(videoSource)
+    }
+
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+
+    val exoPlayer = remember(videoSource, isYouTube) {
+        if (isYouTube) {
             null
+        } else {
+            try {
+                ExoPlayer.Builder(context).build().apply {
+                    if (!videoSource.isNullOrBlank()) {
+                        val mediaItem = MediaItem.fromUri(Uri.parse(videoSource))
+                        setMediaItem(mediaItem)
+                        repeatMode = Player.REPEAT_MODE_ONE
+                        prepare()
+                        playWhenReady = isPlaying
+                    }
+                    addListener(object : Player.Listener {
+                        override fun onPlaybackStateChanged(state: Int) {
+                            isVideoBuffering = state == Player.STATE_BUFFERING
+                        }
+
+                        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                            isVideoBuffering = false
+                        }
+                    })
+                }
+            } catch (e: Throwable) {
+                null
+            }
         }
     }
 
@@ -94,10 +115,21 @@ fun VerticalEpisodePlayer(
         }
     }
 
-    LaunchedEffect(isPlaying, exoPlayer) {
-        try {
-            exoPlayer?.playWhenReady = isPlaying && !isPlayerPaused
-        } catch (_: Throwable) {}
+    LaunchedEffect(isPlaying, isPlayerPaused, isYouTube) {
+        if (isYouTube) {
+            isVideoBuffering = false
+            try {
+                if (isPlaying && !isPlayerPaused) {
+                    webViewRef?.evaluateJavascript("if(typeof player !== 'undefined' && player.playVideo) player.playVideo();", null)
+                } else {
+                    webViewRef?.evaluateJavascript("if(typeof player !== 'undefined' && player.pauseVideo) player.pauseVideo();", null)
+                }
+            } catch (_: Throwable) {}
+        } else {
+            try {
+                exoPlayer?.playWhenReady = isPlaying && !isPlayerPaused
+            } catch (_: Throwable) {}
+        }
     }
 
     Box(
@@ -114,48 +146,92 @@ fun VerticalEpisodePlayer(
                     },
                     onTap = {
                         isPlayerPaused = !isPlayerPaused
-                        exoPlayer?.playWhenReady = !isPlayerPaused
+                        if (isYouTube) {
+                            if (isPlayerPaused) {
+                                webViewRef?.evaluateJavascript("if(typeof player !== 'undefined') player.pauseVideo();", null)
+                            } else {
+                                webViewRef?.evaluateJavascript("if(typeof player !== 'undefined') player.playVideo();", null)
+                            }
+                        } else {
+                            exoPlayer?.playWhenReady = !isPlayerPaused
+                        }
                     }
                 )
             }
     ) {
-        // Player de Vídeo
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exoPlayer
-                    useController = false
-                    layoutParams = android.view.ViewGroup.LayoutParams(
-                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                }
-            },
-            update = { playerView ->
-                playerView.player = exoPlayer
-            },
-            modifier = Modifier.fillMaxSize()
-        )
+        if (isYouTube && youtubeVideoId != null) {
+            // Player Integrado de YouTube Camuflado (Execução nativa sem sair do app)
+            AndroidView(
+                factory = { ctx ->
+                    WebView(ctx).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.mediaPlaybackRequiresUserGesture = false
+                        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                        setBackgroundColor(android.graphics.Color.BLACK)
+                        webChromeClient = WebChromeClient()
+                        webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                                return true // Previne abrir fora do app
+                            }
+                        }
+                        val embedHtml = YouTubeHelper.buildEmbedHtml(youtubeVideoId)
+                        loadDataWithBaseURL("https://www.youtube-nocookie.com", embedHtml, "text/html", "UTF-8", null)
+                        webViewRef = this
+                    }
+                },
+                update = { webView ->
+                    webViewRef = webView
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            // Player de Vídeo ExoPlayer (MP4 / Streams)
+            AndroidView(
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        player = exoPlayer
+                        useController = false
+                        layoutParams = android.view.ViewGroup.LayoutParams(
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                    }
+                },
+                update = { playerView ->
+                    playerView.player = exoPlayer
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         // Overlay de Pausa
         if (isPlayerPaused) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f)),
+                    .background(Color.Black.copy(alpha = 0.35f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Filled.PlayArrow,
-                    contentDescription = "Pausado",
-                    tint = Color.White.copy(alpha = 0.8f),
-                    modifier = Modifier.size(72.dp)
-                )
+                Surface(
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.6f),
+                    modifier = Modifier.size(80.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Filled.PlayArrow,
+                            contentDescription = "Pausado",
+                            tint = Color.White,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+                }
             }
         }
 
         // Loading do Vídeo
-        if (isVideoBuffering) {
+        if (isVideoBuffering && !isYouTube) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -177,11 +253,11 @@ fun VerticalEpisodePlayer(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(220.dp)
+                .height(240.dp)
                 .align(Alignment.BottomCenter)
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f), Color.Black)
                     )
                 )
         )
@@ -190,57 +266,70 @@ fun VerticalEpisodePlayer(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 16.dp, bottom = 80.dp, end = 80.dp)
+                .padding(start = 16.dp, end = 80.dp, bottom = 24.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .background(DramaCrimson, RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = DramaCrimson
                 ) {
                     Text(
-                        text = "EP ${episode.episodeNumber}",
+                        text = drama.genre,
                         color = Color.White,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = drama.genre,
-                    color = TextSecondary,
-                    fontSize = 12.sp
+                    text = "EP ${episode.episodeNumber}/${drama.totalEpisodes}",
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             Text(
                 text = drama.title,
                 color = TextPrimary,
                 fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
             )
 
-            if (episode.title.isNotBlank()) {
-                Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = episode.title,
+                color = Color.White.copy(alpha = 0.95f),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1
+            )
+
+            if (drama.description.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = episode.title,
+                    text = drama.description,
                     color = TextSecondary,
-                    fontSize = 13.sp
+                    fontSize = 12.sp,
+                    maxLines = 2
                 )
             }
         }
 
-        // Botões Laterais Direitos (Estilo TikTok / Vertical Player)
+        // Ações Laterais (Inferior Direito)
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 12.dp, bottom = 85.dp),
+                .padding(end = 12.dp, bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Curtir
+            // Botão de Curtir
             IconButton(
                 onClick = onToggleLike,
                 modifier = Modifier

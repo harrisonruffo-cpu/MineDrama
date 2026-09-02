@@ -59,6 +59,29 @@ class AuthManager(context: Context) {
         )
     }
 
+    fun loginWithFacebook(
+        name: String = "Usuário Facebook",
+        email: String = "usuario.fb@facebook.com",
+        avatarUrl: String = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"
+    ) {
+        prefs.edit()
+            .putString("user_email", email)
+            .putString("user_name", name)
+            .putString("user_avatar", avatarUrl)
+            .putInt("user_coins", 300)
+            .putBoolean("user_is_vip", true)
+            .apply()
+
+        _currentUser.value = UserProfile(
+            id = "fb_${Math.abs(email.hashCode())}",
+            name = name,
+            email = email,
+            avatarUrl = avatarUrl,
+            coinsBalance = 300,
+            isVip = true
+        )
+    }
+
     fun login(name: String, email: String) {
         val avatar = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80"
         prefs.edit()

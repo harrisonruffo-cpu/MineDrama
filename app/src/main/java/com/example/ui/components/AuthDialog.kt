@@ -24,7 +24,8 @@ import com.example.ui.theme.TextSecondary
 fun AuthDialog(
     onDismiss: () -> Unit,
     onLogin: (name: String, email: String) -> Unit,
-    onGoogleLogin: () -> Unit = {}
+    onGoogleLogin: () -> Unit = {},
+    onFacebookLogin: () -> Unit = {}
 ) {
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -80,6 +81,40 @@ fun AuthDialog(
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = "Continuar com o Google",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Botão de Login com Facebook
+                Button(
+                    onClick = {
+                        onFacebookLogin()
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF1877F2),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().height(46.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "f",
+                            fontWeight = FontWeight.Black,
+                            fontSize = 20.sp,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Continuar com Facebook",
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 14.sp
                         )
@@ -143,4 +178,3 @@ fun AuthDialog(
         containerColor = DarkSurfaceElevated
     )
 }
-

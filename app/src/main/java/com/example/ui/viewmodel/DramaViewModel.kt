@@ -236,6 +236,14 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
         authManager.loginWithGoogle(name, email, avatarUrl)
     }
 
+    fun loginWithFacebook(
+        name: String = "Usuário Facebook",
+        email: String = "usuario.fb@facebook.com",
+        avatarUrl: String = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"
+    ) {
+        authManager.loginWithFacebook(name, email, avatarUrl)
+    }
+
     fun logout() {
         authManager.logout()
     }
