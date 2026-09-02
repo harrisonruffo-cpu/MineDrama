@@ -16,6 +16,7 @@ jobs:
   build-apk:
     name: Compilar APK Android
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout do Código
@@ -24,18 +25,11 @@ jobs:
       - name: Configurar JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
 
-      - name: Configurar Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Garantir Permissão de Execução no Gradle
-        run: |
-          if [ -f "gradlew" ]; then
-            chmod +x gradlew
-          fi
+      - name: Configurar Gradle com Cache Automático
+        uses: gradle/actions/setup-gradle@v3
 
       - name: Criar mock google-services.json se ausente
         run: |
@@ -65,13 +59,12 @@ jobs:
           fi
 
       - name: Compilar APK (:app:assembleDebug)
-        env:
-          JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
         run: |
           if [ -f "gradlew" ]; then
-            ./gradlew :app:assembleDebug --stacktrace -Dorg.gradle.configuration-cache=false -Djava.awt.headless=true
+            chmod +x gradlew
+            ./gradlew :app:assembleDebug --no-daemon --stacktrace
           else
-            gradle :app:assembleDebug --stacktrace -Dorg.gradle.configuration-cache=false -Djava.awt.headless=true
+            gradle :app:assembleDebug --no-daemon --stacktrace
           fi
 
       - name: Organizar e Renomear APK de Saída
