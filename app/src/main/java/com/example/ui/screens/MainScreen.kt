@@ -1,26 +1,27 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import android.app.Activity
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Drama
 import com.example.ui.components.AuthDialog
 import com.example.ui.components.EpisodesBottomSheet
 import com.example.ui.components.VerticalEpisodePlayer
-import com.example.ui.theme.DarkBackground
-import com.example.ui.theme.DarkSurface
-import com.example.ui.theme.DramaCrimson
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.*
 import com.example.ui.viewmodel.DramaViewModel
 import com.example.ui.viewmodel.VideoUploadViewModel
 
@@ -29,10 +30,12 @@ fun MainScreen(
     dramaViewModel: DramaViewModel,
     uploadViewModel: VideoUploadViewModel
 ) {
+    val context = LocalContext.current
     var currentNavIndex by remember { mutableIntStateOf(0) }
     var selectedDramaForDetail by remember { mutableStateOf<Drama?>(null) }
     var showAuthDialog by remember { mutableStateOf(false) }
     var showEpisodesSheet by remember { mutableStateOf(false) }
+    var showExitConfirmDialog by remember { mutableStateOf(false) }
 
     val allDramas by dramaViewModel.allDramas.collectAsState()
     val currentDrama by dramaViewModel.currentDrama.collectAsState()
@@ -40,11 +43,92 @@ fun MainScreen(
     val favoriteDramaIds by dramaViewModel.favoriteDramaIds.collectAsState()
     val currentUser by dramaViewModel.currentUser.collectAsState()
 
+    // Gerenciador do Botão Voltar do Android
+    BackHandler {
+        when {
+            showExitConfirmDialog -> {
+                showExitConfirmDialog = false
+            }
+            showAuthDialog -> {
+                showAuthDialog = false
+            }
+            showEpisodesSheet -> {
+                showEpisodesSheet = false
+            }
+            selectedDramaForDetail != null -> {
+                selectedDramaForDetail = null
+            }
+            currentNavIndex != 0 -> {
+                currentNavIndex = 0
+            }
+            else -> {
+                // Está na tela inicial (Para Você), exibe confirmação para sair
+                showExitConfirmDialog = true
+            }
+        }
+    }
+
+    // Modal de Confirmação para Sair do App
+    if (showExitConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirmDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Filled.ExitToApp,
+                    contentDescription = null,
+                    tint = DramaCrimsonBright,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Sair do Litoral Novelas?",
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Tem certeza que deseja fechar o aplicativo?",
+                    color = TextSecondary,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showExitConfirmDialog = false
+                        (context as? Activity)?.finish()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Sim, Sair", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showExitConfirmDialog = false },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Continuar Assistindo", color = TextPrimary)
+                }
+            },
+            shape = RoundedCornerShape(14.dp),
+            containerColor = DarkSurfaceElevated
+        )
+    }
+
     if (showAuthDialog) {
         AuthDialog(
             onDismiss = { showAuthDialog = false },
             onLogin = { name, email ->
                 dramaViewModel.login(name, email)
+                showAuthDialog = false
+            },
+            onGoogleLogin = {
+                dramaViewModel.loginWithGoogle()
                 showAuthDialog = false
             }
         )

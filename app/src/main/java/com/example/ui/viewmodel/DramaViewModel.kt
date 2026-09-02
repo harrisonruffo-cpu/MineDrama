@@ -228,6 +228,14 @@ class DramaViewModel(application: Application) : AndroidViewModel(application) {
         authManager.login(name, email)
     }
 
+    fun loginWithGoogle(
+        name: String = "Usuário Google",
+        email: String = "usuario@gmail.com",
+        avatarUrl: String = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80"
+    ) {
+        authManager.loginWithGoogle(name, email, avatarUrl)
+    }
+
     fun logout() {
         authManager.logout()
     }

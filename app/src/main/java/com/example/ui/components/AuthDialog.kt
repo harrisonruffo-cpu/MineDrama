@@ -1,22 +1,30 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.DarkSurfaceElevated
 import com.example.ui.theme.DramaCrimson
+import com.example.ui.theme.DramaGold
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
 @Composable
 fun AuthDialog(
     onDismiss: () -> Unit,
-    onLogin: (name: String, email: String) -> Unit
+    onLogin: (name: String, email: String) -> Unit,
+    onGoogleLogin: () -> Unit = {}
 ) {
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -24,25 +32,82 @@ fun AuthDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(
-                text = "Entrar ou Criar Perfil",
-                color = TextPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.CloudDone, contentDescription = null, tint = DramaGold, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Login & Salvar na Nuvem",
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         },
         text = {
             Column {
                 Text(
-                    text = "Salve seu progresso, favoritos e acesse novos dramas em qualquer dispositivo.",
+                    text = "Conecte sua conta para sincronizar favoritos, histórico e assistir novelas em qualquer aparelho.",
                     color = TextSecondary,
                     fontSize = 13.sp
                 )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Botão de Login com Google
+                Button(
+                    onClick = {
+                        onGoogleLogin()
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color(0xFF1F1F1F)
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                    border = BorderStroke(1.dp, Color(0xFFE0E0E0))
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "G",
+                            fontWeight = FontWeight.Black,
+                            fontSize = 18.sp,
+                            color = Color(0xFF4285F4)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Continuar com o Google",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF333333))
+                    Text(
+                        text = " ou com e-mail ",
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(horizontal = 6.dp)
+                    )
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF333333))
+                }
+
                 Spacer(modifier = Modifier.height(12.dp))
+
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Nome") },
+                    label = { Text("Nome Completo") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -66,7 +131,7 @@ fun AuthDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = DramaCrimson),
                 enabled = email.isNotBlank()
             ) {
-                Text("Entrar")
+                Text("Entrar com E-mail")
             }
         },
         dismissButton = {
@@ -78,3 +143,4 @@ fun AuthDialog(
         containerColor = DarkSurfaceElevated
     )
 }
+

@@ -55,46 +55,86 @@ class AppwriteDramaDataSource {
                             put("durationSeconds", ep.durationSeconds)
                             put("isFree", ep.isFree)
                             put("thumbnail", ep.thumbnail)
+                            put("localUri", ep.localUri ?: "")
                         }
                     )
                 }
             }.toString()
 
-            val payload = mapOf(
+            val docId = if (drama.id.isNotBlank() && drama.id.length <= 36 && !drama.id.contains(" ") && !drama.id.contains("-")) {
+                drama.id.replace(Regex("[^a-zA-Z0-9_]"), "_").take(36)
+            } else {
+                ID.unique()
+            }
+
+            // Tentativa 1: Payload primário correspondente às colunas criadas no Appwrite
+            // (title, synopsis, coverUrl, tags, episodes, authorName, createdAt, views, rating)
+            val primaryPayload = mutableMapOf<String, Any>(
+                "title" to drama.title,
+                "synopsis" to (drama.description.ifBlank { "Novela exclusiva Litoral Novelas." }),
+                "coverUrl" to drama.coverUrl,
+                "tags" to drama.genre,
+                "episodes" to listOf(episodesJson),
+                "authorName" to listOf("Litoral Novelas"),
+                "createdAt" to listOf(drama.createdAt.toString()),
+                "views" to listOf(drama.viewsCount.toString()),
+                "rating" to drama.rating.toString()
+            )
+
+            // Tentativa 2: Payload com tipos simples (caso colunas não sejam Array)
+            val singleTypePayload = mutableMapOf<String, Any>(
+                "title" to drama.title,
+                "synopsis" to (drama.description.ifBlank { "Novela exclusiva Litoral Novelas." }),
+                "coverUrl" to drama.coverUrl,
+                "tags" to drama.genre,
+                "episodes" to episodesJson,
+                "authorName" to "Litoral Novelas",
+                "createdAt" to drama.createdAt.toString(),
+                "views" to drama.viewsCount.toString(),
+                "rating" to drama.rating.toString()
+            )
+
+            // Tentativa 3: Payload legado/genérico
+            val legacyPayload = mutableMapOf<String, Any>(
                 "title" to drama.title,
                 "description" to drama.description,
                 "coverUrl" to drama.coverUrl,
-                "bannerUrl" to drama.bannerUrl,
                 "genre" to drama.genre,
-                "totalEpisodes" to drama.totalEpisodes,
-                "rating" to drama.rating,
-                "viewsCount" to drama.viewsCount,
-                "likesCount" to drama.likesCount,
-                "isTrending" to drama.isTrending,
-                "isFeatured" to drama.isFeatured,
-                "episodesJson" to episodesJson
+                "episodesJson" to episodesJson,
+                "rating" to drama.rating.toString()
             )
 
-            try {
-                // Tenta atualizar caso já exista
-                db.updateDocument(
-                    databaseId = Appwrite.DATABASE_ID,
-                    collectionId = Appwrite.COLLECTION_DRAMAS,
-                    documentId = drama.id,
-                    data = payload
-                )
-                Log.d(TAG, "Drama atualizado com sucesso no Appwrite: ${drama.id}")
-            } catch (_: Throwable) {
-                // Se não existir, cria com o ID especificado
-                db.createDocument(
-                    databaseId = Appwrite.DATABASE_ID,
-                    collectionId = Appwrite.COLLECTION_DRAMAS,
-                    documentId = if (drama.id.isNotBlank() && drama.id.length <= 36 && !drama.id.contains(" ")) drama.id else ID.unique(),
-                    data = payload
-                )
-                Log.d(TAG, "Drama criado com sucesso no Appwrite")
+            val payloadsToTry = listOf(primaryPayload, singleTypePayload, legacyPayload)
+            var saved = false
+
+            for ((index, currentPayload) in payloadsToTry.withIndex()) {
+                if (saved) break
+                try {
+                    try {
+                        db.updateDocument(
+                            databaseId = Appwrite.DATABASE_ID,
+                            collectionId = Appwrite.COLLECTION_DRAMAS,
+                            documentId = docId,
+                            data = currentPayload
+                        )
+                        Log.d(TAG, "Drama atualizado com sucesso no Appwrite (tentativa $index): $docId")
+                        saved = true
+                    } catch (_: Throwable) {
+                        db.createDocument(
+                            databaseId = Appwrite.DATABASE_ID,
+                            collectionId = Appwrite.COLLECTION_DRAMAS,
+                            documentId = docId,
+                            data = currentPayload
+                        )
+                        Log.d(TAG, "Drama criado com sucesso no Appwrite (tentativa $index): $docId")
+                        saved = true
+                    }
+                } catch (e: Throwable) {
+                    Log.w(TAG, "Tentativa $index falhou ao salvar no Appwrite: ${e.message}")
+                }
             }
-            true
+
+            saved
         } catch (e: Throwable) {
             Log.e(TAG, "Falha ao salvar drama no Appwrite: ${e.message}", e)
             false
@@ -106,7 +146,12 @@ class AppwriteDramaDataSource {
             val data = doc.data
             val episodes = mutableListOf<Episode>()
 
-            val epRaw = data["episodesJson"] as? String
+            // Suporte a episódios tanto em "episodes" (lista/string) quanto "episodesJson"
+            val epRaw = when (val raw = data["episodes"] ?: data["episodesJson"]) {
+                is List<*> -> raw.firstOrNull()?.toString()
+                is String -> raw
+                else -> null
+            }
             if (!epRaw.isNullOrBlank()) {
                 try {
                     val arr = JSONArray(epRaw)
@@ -121,7 +166,8 @@ class AppwriteDramaDataSource {
                                 videoUrl = obj.optString("videoUrl"),
                                 durationSeconds = obj.optInt("durationSeconds", 90),
                                 isFree = obj.optBoolean("isFree", true),
-                                thumbnail = obj.optString("thumbnail")
+                                thumbnail = obj.optString("thumbnail"),
+                                localUri = obj.optString("localUri").takeIf { it.isNotBlank() }
                             )
                         )
                     }
@@ -130,19 +176,32 @@ class AppwriteDramaDataSource {
                 }
             }
 
+            val desc = (data["synopsis"] ?: data["description"])?.let {
+                if (it is List<*>) it.firstOrNull()?.toString() else it.toString()
+            } ?: ""
+
+            val genreTag = (data["tags"] ?: data["genre"])?.let {
+                if (it is List<*>) it.firstOrNull()?.toString() else it.toString()
+            } ?: "Romance"
+
+            val ratingVal = (data["rating"])?.let {
+                if (it is List<*>) it.firstOrNull()?.toString()?.toDoubleOrNull()
+                else (it as? Number)?.toDouble() ?: it.toString().toDoubleOrNull()
+            } ?: 4.9
+
             Drama(
                 id = doc.id,
                 title = (data["title"] as? String) ?: "Sem Título",
-                description = (data["description"] as? String) ?: "",
+                description = desc,
                 coverUrl = (data["coverUrl"] as? String) ?: "",
-                bannerUrl = (data["bannerUrl"] as? String) ?: "",
-                genre = (data["genre"] as? String) ?: "Romance",
-                totalEpisodes = (data["totalEpisodes"] as? Number)?.toInt() ?: episodes.size.coerceAtLeast(1),
-                rating = (data["rating"] as? Number)?.toDouble() ?: 4.8,
-                viewsCount = (data["viewsCount"] as? Number)?.toLong() ?: 1000L,
-                likesCount = (data["likesCount"] as? Number)?.toLong() ?: 200L,
-                isTrending = (data["isTrending"] as? Boolean) ?: false,
-                isFeatured = (data["isFeatured"] as? Boolean) ?: false,
+                bannerUrl = (data["coverUrl"] as? String) ?: "",
+                genre = genreTag,
+                totalEpisodes = episodes.size.coerceAtLeast(1),
+                rating = ratingVal,
+                viewsCount = 1200L,
+                likesCount = 350L,
+                isTrending = true,
+                isFeatured = true,
                 episodes = episodes,
                 isPublishedLocally = false
             )
